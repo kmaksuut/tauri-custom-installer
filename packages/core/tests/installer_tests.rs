@@ -60,3 +60,67 @@ fn test_archive_extraction_and_progress() {
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
+
+#[test]
+fn test_registry_lifecycle() {
+    use tauri_custom_installer_core::models::InstallOptions;
+    use tauri_custom_installer_core::registry::{
+        check_existing_installation, register_uninstall_entry, remove_uninstall_entry,
+    };
+
+    let test_app_id = "com.test.tci.integration.test.999";
+    let test_app_name = "TCI Integration Test App";
+
+    // Clean before starting
+    let _ = remove_uninstall_entry(test_app_id, test_app_name);
+    assert!(check_existing_installation(test_app_id).is_none());
+
+    // Register
+    let options = InstallOptions {
+        app_name: test_app_name.to_string(),
+        app_id: test_app_id.to_string(),
+        app_version: "2.4.0".to_string(),
+        publisher: "Integration Tester".to_string(),
+        executable_name: "test-app.exe".to_string(),
+        install_dir: r"C:\Temp\TCI_Test".to_string(),
+        create_desktop_shortcut: false,
+        create_start_menu_shortcut: false,
+        auto_launch_on_startup: false,
+        launch_after_install: false,
+    };
+
+    register_uninstall_entry(&options, 10 * 1024 * 1024).expect("Failed to register");
+
+    #[cfg(target_os = "windows")]
+    {
+        let existing = check_existing_installation(test_app_id).expect("Entry should exist");
+        assert_eq!(existing.version, "2.4.0");
+        assert_eq!(existing.install_path, r"C:\Temp\TCI_Test");
+    }
+
+    // Cleanup
+    remove_uninstall_entry(test_app_id, test_app_name).expect("Failed to remove");
+    assert!(check_existing_installation(test_app_id).is_none());
+}
+
+#[test]
+fn test_shortcut_creation_in_temp() {
+    use tauri_custom_installer_core::shortcuts::create_shortcut;
+
+    let temp_dir = std::env::temp_dir().join(format!("tci_lnk_test_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+
+    let dummy_exe = temp_dir.join("dummy.exe");
+    std::fs::write(&dummy_exe, b"MZ").unwrap();
+
+    let lnk_path = temp_dir.join("TestShortcut.lnk");
+    create_shortcut(&dummy_exe, &lnk_path, "Test Shortcut Description", &temp_dir)
+        .expect("Shortcut creation should succeed");
+
+    #[cfg(target_os = "windows")]
+    {
+        assert!(lnk_path.exists(), "Shortcut .lnk file should exist on Windows");
+    }
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
