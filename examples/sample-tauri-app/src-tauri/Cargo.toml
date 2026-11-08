@@ -1,0 +1,13 @@
+[package]
+name = "sample-tauri-app"
+version = "1.0.0"
+description = "Demonstration app for tauri-custom-installer"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", default-features = false }
+
+[dependencies]
+tauri = { version = "2", features = ["wry"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

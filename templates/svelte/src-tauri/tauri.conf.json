@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.tauri.app/v2/config",
+  "productName": "Application Setup",
+  "version": "1.0.0",
+  "identifier": "com.tauri.custominstaller.svelte.setup",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1423",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Application Setup",
+        "width": 680,
+        "height": 450,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "center": true,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

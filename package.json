@@ -1,0 +1,34 @@
+{
+  "name": "tauri-custom-installer-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Custom, modern, web-based installers for Tauri v2 applications",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "templates/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "bun run --filter \"*\" build",
+    "test": "bun run --filter \"*\" test",
+    "lint": "bun run --filter \"*\" lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "keywords": [
+    "tauri",
+    "tauri-v2",
+    "installer",
+    "custom-installer",
+    "react",
+    "svelte",
+    "vue",
+    "windows-installer",
+    "desktop"
+  ],
+  "author": "Antigravity Team & Community",
+  "license": "MIT"
+}

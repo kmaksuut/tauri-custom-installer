@@ -1,0 +1,30 @@
+{
+  "name": "tauri-custom-installer",
+  "version": "0.1.0",
+  "description": "CLI toolkit to generate, develop, and build modern custom installers for Tauri v2",
+  "bin": {
+    "tci": "./dist/index.js",
+    "tauri-custom-installer": "./dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "commander": "^13.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/node": "^22.13.1",
+    "typescript": "^5.7.3"
+  },
+  "license": "MIT"
+}

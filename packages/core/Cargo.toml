@@ -1,0 +1,28 @@
+[package]
+name = "tauri-custom-installer-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core native engine for Tauri v2 custom installers"
+authors = ["Antigravity Team & Community"]
+license = "MIT"
+
+[dependencies]
+tauri = { version = "2", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+dirs = "6.0"
+sysinfo = "0.33"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Registry",
+] }

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Application Setup</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="installer-body">
+    <div class="window-card">
+      <div class="titlebar" data-tauri-drag-region>
+        <div class="titlebar-title">
+          <span class="indicator"></span>
+          <span id="window-title">Application Setup</span>
+        </div>
+        <div class="titlebar-controls">
+          <button id="btn-close" class="btn-ctrl">✕</button>
+        </div>
+      </div>
+
+      <div class="content" id="step-welcome">
+        <div class="header-section">
+          <h1 id="app-name">My Application</h1>
+          <p id="app-desc" class="desc">Welcome to the setup wizard. Click below to install.</p>
+        </div>
+
+        <div class="options-box">
+          <label class="opt-label">
+            <input type="checkbox" id="chk-desktop" checked />
+            Create Desktop shortcut
+          </label>
+          <label class="opt-label">
+            <input type="checkbox" id="chk-startmenu" checked />
+            Create Start Menu shortcut
+          </label>
+        </div>
+
+        <div class="footer">
+          <button id="btn-install" class="btn-primary">Install Now</button>
+        </div>
+      </div>
+
+      <div class="content hidden" id="step-installing">
+        <h2>Installing Application...</h2>
+        <div class="progress-bar-container">
+          <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+        </div>
+        <p id="progress-file" class="desc-file">Extracting files...</p>
+      </div>
+
+      <div class="content hidden" id="step-completed">
+        <h2>Installation Complete!</h2>
+        <p class="desc">The application has been successfully installed on your computer.</p>
+        <div class="footer">
+          <button id="btn-finish" class="btn-primary">Finish</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

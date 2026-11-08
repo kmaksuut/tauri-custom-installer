@@ -1,0 +1,45 @@
+{
+  "name": "@tauri-custom-installer/client",
+  "version": "0.1.0",
+  "description": "Client SDK and React hooks for Tauri v2 custom installers",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js",
+      "require": "./dist/react/index.js",
+      "default": "./dist/react/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test"
+  },
+  "peerDependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@types/react": "^19.0.8",
+    "react": "^19.0.0",
+    "typescript": "^5.7.3"
+  },
+  "license": "MIT"
+}

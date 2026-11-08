@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "packages/core",
+    "templates/react/src-tauri",
+    "templates/vanilla/src-tauri",
+    "templates/svelte/src-tauri",
+    "templates/vue/src-tauri",
+    "examples/sample-tauri-app/src-tauri",
+    "examples/sample-tauri-app/installer/src-tauri"
+]
