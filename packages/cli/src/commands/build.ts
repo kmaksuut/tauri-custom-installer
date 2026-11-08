@@ -111,19 +111,31 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const setupExeName = `${appConfig.appName.replace(/\s+/g, '-')}-Setup-v${appConfig.version}.exe`;
   const finalSetupPath = path.join(outputDist, setupExeName);
 
-  // Search candidate installer binaries
-  const installerBinDirs = [
+  // Search candidate installer binaries (including cargo workspace roots)
+  const installerBinDirs: string[] = [
     path.join(installerTauriDir, 'target', 'release'),
-    path.join(cwd, 'target', 'release'),
     path.join(installerTauriDir, 'target', 'release', 'bundle', 'nsis'),
   ];
+
+  let checkDir: string | null = cwd;
+  while (checkDir) {
+    installerBinDirs.push(path.join(checkDir, 'target', 'release'));
+    const parent = path.dirname(checkDir);
+    if (parent === checkDir) break;
+    checkDir = parent;
+  }
 
   let foundInstaller = false;
   for (const binDir of installerBinDirs) {
     if (fs.existsSync(binDir)) {
       const files = fs.readdirSync(binDir);
       for (const file of files) {
-        if (file.endsWith('.exe') && !file.includes('uninstall-worker')) {
+        if (
+          file.endsWith('.exe') &&
+          !file.includes('uninstall-worker') &&
+          !file.startsWith('build-script') &&
+          (file.includes('installer') || file.toLowerCase().includes(appConfig.appName.toLowerCase().replace(/[^a-z0-9]/g, '')))
+        ) {
           const srcPath = path.join(binDir, file);
           fs.copyFileSync(srcPath, finalSetupPath);
           foundInstaller = true;
