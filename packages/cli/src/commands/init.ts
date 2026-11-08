@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline';
 import pc from 'picocolors';
 import { detectAppConfig } from '../utils/config';
 
@@ -9,9 +10,54 @@ export interface InitOptions {
   force?: boolean;
 }
 
+function promptChoice(question: string, choices: string[], defaultIndex = 0): Promise<string> {
+  return new Promise((resolve) => {
+    if (!process.stdin.isTTY) {
+      resolve(choices[defaultIndex]);
+      return;
+    }
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    console.log(pc.bold(question));
+    choices.forEach((c, idx) => {
+      const isDefault = idx === defaultIndex;
+      console.log(`  ${pc.cyan(`${idx + 1})`)} ${c} ${isDefault ? pc.gray('(default)') : ''}`);
+    });
+
+    rl.question(pc.yellow(`Enter choice [1-${choices.length}]: `), (answer) => {
+      rl.close();
+      const num = parseInt(answer.trim(), 10);
+      if (!isNaN(num) && num >= 1 && num <= choices.length) {
+        resolve(choices[num - 1]);
+      } else {
+        resolve(choices[defaultIndex]);
+      }
+    });
+  });
+}
+
 export async function runInit(options: InitOptions): Promise<void> {
   const cwd = process.cwd();
-  const template = options.template || 'react';
+  let template = options.template;
+
+  if (!template) {
+    const frameworkMap: Record<string, string> = {
+      'React 19 + Tailwind CSS + Lucide (Recommended)': 'react',
+      'Svelte 5 + Tailwind': 'svelte',
+      'Vue 3 + Tailwind': 'vue',
+      'Vanilla HTML/CSS/TypeScript': 'vanilla',
+    };
+    const choice = await promptChoice(
+      '\n? Which framework would you like for your custom installer UI?',
+      Object.keys(frameworkMap),
+      0
+    );
+    template = frameworkMap[choice] || 'react';
+  }
   const targetDir = path.join(cwd, 'installer');
 
   console.log(pc.cyan(`\n✨ Initializing Tauri Custom Installer with template: ${pc.bold(template)}`));

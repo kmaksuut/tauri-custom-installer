@@ -17,7 +17,7 @@ program
 program
   .command('init')
   .description('Initialize custom installer directory in your Tauri v2 project')
-  .option('-t, --template <template>', 'UI template to use: react, svelte, vue, vanilla', 'react')
+  .option('-t, --template <template>', 'UI template to use: react, svelte, vue, vanilla')
   .option('-n, --name <name>', 'Name of the application')
   .option('-f, --force', 'Overwrite existing installer directory')
   .action(runInit);
