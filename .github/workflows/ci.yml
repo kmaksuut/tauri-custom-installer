@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-rust:
+    name: Rust Core Tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run Core Tests
+        run: cargo test --package tauri-custom-installer-core
+
+  test-client:
+    name: TypeScript Client Tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install & Run Client Tests
+        run: |
+          cd packages/client
+          bun install
+          bun test
+          bun run build
+
+  build-templates:
+    name: Template Frontend Builds
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Build React Template
+        run: |
+          cd templates/react
+          bun install
+          bun run build
+      - name: Build Vanilla Template
+        run: |
+          cd templates/vanilla
+          bun install
+          bun run build
