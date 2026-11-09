@@ -280,4 +280,4 @@ The generated `dist/MyApp-Setup.exe` accepts standard switches:
 
 ## 📄 License
 
-MIT © [kmaksuut](https://github.com/kmaksuut) & Tauri Custom Installer Contributors.
+MIT © [kmaksuut](https://github.com/kmaksuut)
