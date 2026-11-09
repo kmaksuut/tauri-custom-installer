@@ -362,7 +362,12 @@ async function buildMainTauriApp(cwd, mainTauriDir, pm, isRelease) {
             // ignore
         }
     }
-    const cargoArgs = ['build', ...(isRelease ? ['--release'] : [])];
+    const cargoArgs = [
+        'build',
+        ...(isRelease ? ['--release'] : []),
+        '--features',
+        'tauri/custom-protocol',
+    ];
     await (0, exec_1.runProcess)('cargo', cargoArgs, { cwd: mainTauriDir });
 }
 async function resolveOrBuildRuntimeExecutable(cwd, installerDir, appConfig, isRelease) {
@@ -400,7 +405,7 @@ async function resolveOrBuildRuntimeExecutable(cwd, installerDir, appConfig, isR
         if (node_fs_1.default.existsSync(prebuiltRuntime)) {
             return prebuiltRuntime;
         }
-        await (0, exec_1.runProcess)('cargo', ['build', ...(isRelease ? ['--release'] : [])], {
+        await (0, exec_1.runProcess)('cargo', ['build', ...(isRelease ? ['--release'] : []), '--features', 'tauri/custom-protocol'], {
             cwd: installerTauriDir,
         });
         if (exactBinName && node_fs_1.default.existsSync(node_path_1.default.join(binDir, exactBinName))) {

@@ -469,7 +469,12 @@ async function buildMainTauriApp(
     }
   }
 
-  const cargoArgs = ['build', ...(isRelease ? ['--release'] : [])];
+  const cargoArgs = [
+    'build',
+    ...(isRelease ? ['--release'] : []),
+    '--features',
+    'tauri/custom-protocol',
+  ];
   await runProcess('cargo', cargoArgs, { cwd: mainTauriDir });
 }
 
@@ -520,9 +525,13 @@ async function resolveOrBuildRuntimeExecutable(
       return prebuiltRuntime;
     }
 
-    await runProcess('cargo', ['build', ...(isRelease ? ['--release'] : [])], {
-      cwd: installerTauriDir,
-    });
+    await runProcess(
+      'cargo',
+      ['build', ...(isRelease ? ['--release'] : []), '--features', 'tauri/custom-protocol'],
+      {
+        cwd: installerTauriDir,
+      }
+    );
 
     if (exactBinName && fs.existsSync(path.join(binDir, exactBinName))) {
       return path.join(binDir, exactBinName);

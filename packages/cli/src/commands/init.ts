@@ -252,6 +252,10 @@ export async function runInit(options: InitOptions): Promise<void> {
           cargoStr += '\n[workspace]\n';
         }
       }
+      cargoStr = cargoStr.replace(
+        /features\s*=\s*\[\s*"wry"\s*\]/,
+        'features = ["wry", "custom-protocol"]'
+      );
       fs.writeFileSync(installerCargoPath, cargoStr);
     } catch {
       // ignore

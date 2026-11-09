@@ -218,6 +218,7 @@ async function runInit(options) {
                     cargoStr += '\n[workspace]\n';
                 }
             }
+            cargoStr = cargoStr.replace(/features\s*=\s*\[\s*"wry"\s*\]/, 'features = ["wry", "custom-protocol"]');
             node_fs_1.default.writeFileSync(installerCargoPath, cargoStr);
         }
         catch {
