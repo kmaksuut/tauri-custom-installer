@@ -1,0 +1,62 @@
+name: Publish to GitHub Packages
+
+on:
+  push:
+    branches: [master, main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish-gpr:
+    name: Publish to GitHub Packages (npm.pkg.github.com)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@${{ github.repository_owner }}'
+
+      - name: Install & Build Packages
+        run: |
+          npm install
+          npm run build
+
+      - name: Publish Client SDK & CLI to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO_URL: https://github.com/${{ github.repository }}.git
+        run: |
+          node -e '
+            const fs = require("fs");
+            const owner = process.env.OWNER.toLowerCase();
+            const repoUrl = process.env.REPO_URL;
+
+            // 1. Prepare @<owner>/tauri-custom-installer-client
+            const clientPkgPath = "packages/client/package.json";
+            const clientPkg = JSON.parse(fs.readFileSync(clientPkgPath, "utf8"));
+            clientPkg.name = `@${owner}/tauri-custom-installer-client`;
+            clientPkg.repository = { type: "git", url: repoUrl };
+            clientPkg.publishConfig = { registry: "https://npm.pkg.github.com", access: "public" };
+            fs.writeFileSync(clientPkgPath, JSON.stringify(clientPkg, null, 2));
+
+            // 2. Prepare @<owner>/tauri-custom-installer (root package)
+            const rootPkgPath = "package.json";
+            const rootPkg = JSON.parse(fs.readFileSync(rootPkgPath, "utf8"));
+            rootPkg.name = `@${owner}/tauri-custom-installer`;
+            rootPkg.repository = { type: "git", url: repoUrl };
+            rootPkg.publishConfig = { registry: "https://npm.pkg.github.com", access: "public" };
+            delete rootPkg.workspaces;
+            fs.writeFileSync(rootPkgPath, JSON.stringify(rootPkg, null, 2));
+          '
+          npm publish ./packages/client --ignore-scripts || true
+          npm publish . --ignore-scripts || true

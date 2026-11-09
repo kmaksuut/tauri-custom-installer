@@ -101,7 +101,18 @@ pnpm add -D github:kmaksuut/tauri-custom-installer
 yarn add -D github:kmaksuut/tauri-custom-installer
 ```
 
-#### Option B: Install from npm Registry
+#### Option B: Install from GitHub Packages (`npm.pkg.github.com`)
+```bash
+# Configure @kmaksuut scope to use GitHub Packages registry
+npm config set @kmaksuut:registry https://npm.pkg.github.com
+
+# Install with Bun or npm
+bun add -d @kmaksuut/tauri-custom-installer
+# or:
+npm install -D @kmaksuut/tauri-custom-installer
+```
+
+#### Option C: Install from npm Registry
 ```bash
 # Bun
 bun add -d tauri-custom-installer
@@ -110,7 +121,7 @@ bun add -d tauri-custom-installer
 npm install -D tauri-custom-installer
 ```
 
-#### Option C: Clone & Run Locally
+#### Option D: Clone & Run Locally
 ```bash
 git clone https://github.com/kmaksuut/tauri-custom-installer.git
 cd tauri-custom-installer
