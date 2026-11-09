@@ -1,4 +1,4 @@
-import { useInstaller } from '@tauri-custom-installer/client';
+import { useInstaller } from '@tauri-custom-installer/client/react';
 import { CompletedStep } from './components/CompletedStep';
 import { InstallingStep } from './components/InstallingStep';
 import { OptionsStep } from './components/OptionsStep';
@@ -20,6 +20,7 @@ export function App() {
     step,
     setStep,
     isUninstallMode,
+    manifest,
     installPath,
     setInstallPath,
     browseInstallPath,
@@ -49,35 +50,39 @@ export function App() {
     requiredBytes: REQUIRED_BYTES,
   });
 
+  const resolvedName = manifest?.appName || APP_NAME;
+  const resolvedVersion = manifest?.version || APP_VERSION;
+  const resolvedPublisher = manifest?.publisher || PUBLISHER;
+
   return (
-    <div className="w-[680px] h-[450px] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative font-sans text-slate-100">
+    <div className="w-screen h-screen max-w-[680px] max-h-[450px] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden relative font-sans text-slate-100">
       {/* Decorative gradient glow */}
       <div className="absolute -top-24 -left-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Borderless Title Bar */}
       <TitleBar
-        title={isUninstallMode ? `${APP_NAME} Uninstaller` : `${APP_NAME} Setup`}
+        title={isUninstallMode ? `${resolvedName} Uninstaller` : `${resolvedName} Setup`}
         onMinimize={minimize}
         onClose={exit}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col relative z-10">
+      <div className="flex-1 flex flex-col relative z-10" role="main">
         {isUninstallMode ? (
           <UninstallView
-            appName={APP_NAME}
-            appId={APP_ID}
-            executableName={EXECUTABLE_NAME}
+            appName={resolvedName}
+            appId={manifest?.appId || APP_ID}
+            executableName={manifest?.executableName || EXECUTABLE_NAME}
             installDir={installPath}
           />
         ) : (
           <>
             {step === 'welcome' && (
               <WelcomeStep
-                appName={APP_NAME}
-                appVersion={APP_VERSION}
-                publisher={PUBLISHER}
+                appName={resolvedName}
+                appVersion={resolvedVersion}
+                publisher={resolvedPublisher}
                 onExpressInstall={startInstall}
                 onCustomInstall={() => setStep('options')}
               />
@@ -95,7 +100,7 @@ export function App() {
                 autoLaunchOnStartup={autoLaunchOnStartup}
                 setAutoLaunchOnStartup={setAutoLaunchOnStartup}
                 validation={validation}
-                requiredBytes={REQUIRED_BYTES}
+                requiredBytes={manifest?.uncompressedSizeBytes || REQUIRED_BYTES}
                 onBack={() => setStep('welcome')}
                 onInstall={startInstall}
               />
@@ -103,7 +108,7 @@ export function App() {
 
             {step === 'running_warning' && (
               <RunningWarningStep
-                appName={APP_NAME}
+                appName={resolvedName}
                 onTerminateAndContinue={terminateRunningAndInstall}
                 onCancel={exit}
               />
@@ -111,7 +116,7 @@ export function App() {
 
             {step === 'installing' && (
               <InstallingStep
-                appName={APP_NAME}
+                appName={resolvedName}
                 progress={progress}
                 onCancel={cancelInstall}
               />
@@ -119,19 +124,24 @@ export function App() {
 
             {step === 'completed' && (
               <CompletedStep
-                appName={APP_NAME}
+                appName={resolvedName}
                 launchAfterInstall={launchAfterInstall}
                 setLaunchAfterInstall={setLaunchAfterInstall}
                 onFinish={launchAfterInstall ? launchApp : exit}
               />
             )}
 
-            {step === 'error' && (
-              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            {(step === 'error' || step === 'cancelled') && (
+              <div
+                className="flex-1 flex flex-col items-center justify-center p-6 text-center"
+                role="alert"
+              >
                 <div className="w-14 h-14 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-4">
                   <span className="text-xl font-bold">!</span>
                 </div>
-                <h2 className="text-lg font-bold text-white">Installation Stopped</h2>
+                <h2 className="text-lg font-bold text-white">
+                  {step === 'cancelled' ? 'Installation Cancelled' : 'Installation Stopped'}
+                </h2>
                 <p className="text-xs text-rose-300 max-w-md mt-2">{errorMessage}</p>
                 <button
                   onClick={() => setStep('welcome')}

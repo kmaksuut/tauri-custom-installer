@@ -1,19 +1,24 @@
 [package]
 name = "tauri-custom-installer-core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Core native engine for Tauri v2 custom installers"
-authors = ["Antigravity Team & Community"]
+authors = ["Tauri Custom Installer Contributors"]
 license = "MIT"
+repository = "https://github.com/tauri-custom-installer/tauri-custom-installer"
+homepage = "https://github.com/tauri-custom-installer/tauri-custom-installer"
+keywords = ["tauri", "installer", "windows", "nsis", "setup"]
+categories = ["development-tools::build-utils", "os::windows-apis"]
 
 [dependencies]
 tauri = { version = "2", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-thiserror = "2.0"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
+tar = "0.4"
+zstd = { version = "0.13", default-features = false }
+sha2 = "0.10"
 dirs = "6.0"
-sysinfo = "0.33"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
@@ -21,8 +26,15 @@ windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
     "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
     "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_System_Registry",
+    "Win32_System_LibraryLoader",
+    "Win32_Security",
+    "Win32_Globalization",
 ] }

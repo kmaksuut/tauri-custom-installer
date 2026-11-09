@@ -1,0 +1,328 @@
+export type SupportedLocale =
+  | 'en'
+  | 'tr'
+  | 'de'
+  | 'fr'
+  | 'es'
+  | 'pt-BR'
+  | 'ru'
+  | 'zh-CN'
+  | 'ja'
+  | 'ko'
+  | 'ar';
+
+export interface InstallerTranslations {
+  welcomeTitle: string;
+  welcomeSubtitle: string;
+  configureButton: string;
+  installNowButton: string;
+  upgradeNowButton: string;
+  repairNowButton: string;
+  installDirectory: string;
+  browseButton: string;
+  desktopShortcut: string;
+  startMenuShortcut: string;
+  launchOnStartup: string;
+  installingTitle: string;
+  cancelButton: string;
+  completedTitle: string;
+  launchAppCheckbox: string;
+  finishButton: string;
+  uninstallTitle: string;
+  purgeUserDataLabel: string;
+  uninstallButton: string;
+  runningWarningTitle: string;
+  closeAndContinueButton: string;
+  backButton: string;
+}
+
+const TRANSLATIONS: Record<SupportedLocale, InstallerTranslations> = {
+  en: {
+    welcomeTitle: 'Welcome to Setup',
+    welcomeSubtitle: 'Fast, secure, and transparent installation wizard.',
+    configureButton: 'Configure Setup',
+    installNowButton: 'Install Now',
+    upgradeNowButton: 'Upgrade Now',
+    repairNowButton: 'Repair Installation',
+    installDirectory: 'Destination Folder',
+    browseButton: 'Browse',
+    desktopShortcut: 'Create Desktop Shortcut',
+    startMenuShortcut: 'Create Start Menu Shortcut',
+    launchOnStartup: 'Launch automatically on Windows startup',
+    installingTitle: 'Installing Application...',
+    cancelButton: 'Cancel',
+    completedTitle: 'Installation Complete',
+    launchAppCheckbox: 'Launch application after closing installer',
+    finishButton: 'Finish',
+    uninstallTitle: 'Uninstall Application',
+    purgeUserDataLabel: 'Delete application settings and WebView2 cache files',
+    uninstallButton: 'Uninstall Now',
+    runningWarningTitle: 'Application is Currently Running',
+    closeAndContinueButton: 'Close App & Continue',
+    backButton: 'Back',
+  },
+  tr: {
+    welcomeTitle: 'Kurulum Sihirbazına Hoş Geldiniz',
+    welcomeSubtitle: 'Hızlı, güvenli ve şeffaf kurulum deneyimi.',
+    configureButton: 'Kurulumu Özelleştir',
+    installNowButton: 'Şimdi Kur',
+    upgradeNowButton: 'Şimdi Güncelle',
+    repairNowButton: 'Kurulumu Onar',
+    installDirectory: 'Kurulum Dizini',
+    browseButton: 'Gözat',
+    desktopShortcut: 'Masaüstü Kısayolu Oluştur',
+    startMenuShortcut: 'Başlat Menüsü Kısayolu Oluştur',
+    launchOnStartup: 'Windows başlangıcında otomatik çalıştır',
+    installingTitle: 'Uygulama Kuruluyor...',
+    cancelButton: 'İptal',
+    completedTitle: 'Kurulum Tamamlandı',
+    launchAppCheckbox: 'Kurulum kapandıktan sonra uygulamayı başlat',
+    finishButton: 'Bitir',
+    uninstallTitle: 'Uygulamayı Kaldır',
+    purgeUserDataLabel: 'Uygulama ayarlarını ve önbellek dosyalarını sil',
+    uninstallButton: 'Şimdi Kaldır',
+    runningWarningTitle: 'Uygulama Şu Anda Çalışıyor',
+    closeAndContinueButton: 'Uygulamayı Kapat ve Devam Et',
+    backButton: 'Geri',
+  },
+  de: {
+    welcomeTitle: 'Willkommen beim Setup',
+    welcomeSubtitle: 'Schneller, sicherer und transparenter Installationsassistent.',
+    configureButton: 'Anpassen',
+    installNowButton: 'Jetzt installieren',
+    upgradeNowButton: 'Jetzt aktualisieren',
+    repairNowButton: 'Reparieren',
+    installDirectory: 'Zielordner',
+    browseButton: 'Durchsuchen',
+    desktopShortcut: 'Desktop-Verknüpfung erstellen',
+    startMenuShortcut: 'Startmenü-Verknüpfung erstellen',
+    launchOnStartup: 'Beim Windows-Start automatisch ausführen',
+    installingTitle: 'Anwendung wird installiert...',
+    cancelButton: 'Abbrechen',
+    completedTitle: 'Installation abgeschlossen',
+    launchAppCheckbox: 'Anwendung nach dem Schließen starten',
+    finishButton: 'Fertigstellen',
+    uninstallTitle: 'Anwendung deinstallieren',
+    purgeUserDataLabel: 'Anwendungseinstellungen und Cache-Dateien löschen',
+    uninstallButton: 'Jetzt deinstallieren',
+    runningWarningTitle: 'Anwendung wird derzeit ausgeführt',
+    closeAndContinueButton: 'Schließen & Fortfahren',
+    backButton: 'Zurück',
+  },
+  fr: {
+    welcomeTitle: "Bienvenue dans l'assistant d'installation",
+    welcomeSubtitle: 'Installation rapide, sécurisée et transparente.',
+    configureButton: 'Personnaliser',
+    installNowButton: 'Installer maintenant',
+    upgradeNowButton: 'Mettre à jour',
+    repairNowButton: 'Réparer',
+    installDirectory: 'Dossier de destination',
+    browseButton: 'Parcourir',
+    desktopShortcut: 'Créer un raccourci sur le Bureau',
+    startMenuShortcut: 'Créer un raccourci dans le menu Démarrer',
+    launchOnStartup: 'Lancer automatiquement au démarrage de Windows',
+    installingTitle: 'Installation en cours...',
+    cancelButton: 'Annuler',
+    completedTitle: 'Installation terminée',
+    launchAppCheckbox: "Lancer l'application à la fermeture",
+    finishButton: 'Terminer',
+    uninstallTitle: "Désinstaller l'application",
+    purgeUserDataLabel: "Supprimer les paramètres et le cache de l'application",
+    uninstallButton: 'Désinstaller',
+    runningWarningTitle: "L'application est en cours d'exécution",
+    closeAndContinueButton: 'Fermer et continuer',
+    backButton: 'Retour',
+  },
+  es: {
+    welcomeTitle: 'Bienvenido al asistente de instalación',
+    welcomeSubtitle: 'Instalación rápida, segura y transparente.',
+    configureButton: 'Configurar',
+    installNowButton: 'Instalar ahora',
+    upgradeNowButton: 'Actualizar ahora',
+    repairNowButton: 'Reparar',
+    installDirectory: 'Carpeta de destino',
+    browseButton: 'Examinar',
+    desktopShortcut: 'Crear acceso directo en el Escritorio',
+    startMenuShortcut: 'Crear acceso directo en el Menú Inicio',
+    launchOnStartup: 'Iniciar automáticamente con Windows',
+    installingTitle: 'Instalando aplicación...',
+    cancelButton: 'Cancelar',
+    completedTitle: 'Instalación completada',
+    launchAppCheckbox: 'Ejecutar la aplicación al finalizar',
+    finishButton: 'Finalizar',
+    uninstallTitle: 'Desinstalar aplicación',
+    purgeUserDataLabel: 'Eliminar configuración y archivos en caché',
+    uninstallButton: 'Desinstalar ahora',
+    runningWarningTitle: 'La aplicación se está ejecutando',
+    closeAndContinueButton: 'Cerrar y continuar',
+    backButton: 'Atrás',
+  },
+  'pt-BR': {
+    welcomeTitle: 'Bem-vindo ao instalador',
+    welcomeSubtitle: 'Instalação rápida, segura e transparente.',
+    configureButton: 'Configurar',
+    installNowButton: 'Instalar agora',
+    upgradeNowButton: 'Atualizar agora',
+    repairNowButton: 'Reparar',
+    installDirectory: 'Pasta de destino',
+    browseButton: 'Procurar',
+    desktopShortcut: 'Criar atalho na Área de Trabalho',
+    startMenuShortcut: 'Criar atalho no Menu Iniciar',
+    launchOnStartup: 'Iniciar automaticamente com o Windows',
+    installingTitle: 'Instalando aplicativo...',
+    cancelButton: 'Cancelar',
+    completedTitle: 'Instalação concluída',
+    launchAppCheckbox: 'Iniciar aplicativo ao concluir',
+    finishButton: 'Concluir',
+    uninstallTitle: 'Desinstalar aplicativo',
+    purgeUserDataLabel: 'Excluir configurações e cache do aplicativo',
+    uninstallButton: 'Desinstalar agora',
+    runningWarningTitle: 'O aplicativo está em execução',
+    closeAndContinueButton: 'Fechar e continuar',
+    backButton: 'Voltar',
+  },
+  ru: {
+    welcomeTitle: 'Добро пожаловать в мастер установки',
+    welcomeSubtitle: 'Быстрая, безопасная и прозрачная установка.',
+    configureButton: 'Настроить',
+    installNowButton: 'Установить',
+    upgradeNowButton: 'Обновить',
+    repairNowButton: 'Восстановить',
+    installDirectory: 'Папка установки',
+    browseButton: 'Обзор',
+    desktopShortcut: 'Создать ярлык на рабочем столе',
+    startMenuShortcut: 'Создать ярлык в меню «Пуск»',
+    launchOnStartup: 'Запускать при старте Windows',
+    installingTitle: 'Установка приложения...',
+    cancelButton: 'Отмена',
+    completedTitle: 'Установка завершена',
+    launchAppCheckbox: 'Запустить приложение после закрытия',
+    finishButton: 'Готово',
+    uninstallTitle: 'Удаление приложения',
+    purgeUserDataLabel: 'Удалить настройки и кэш приложения',
+    uninstallButton: 'Удалить',
+    runningWarningTitle: 'Приложение сейчас запущено',
+    closeAndContinueButton: 'Закрыть и продолжить',
+    backButton: 'Назад',
+  },
+  'zh-CN': {
+    welcomeTitle: '欢迎使用安装向导',
+    welcomeSubtitle: '快速、安全、透明的安装体验。',
+    configureButton: '自定义安装',
+    installNowButton: '立即安装',
+    upgradeNowButton: '立即升级',
+    repairNowButton: '修复安装',
+    installDirectory: '安装目录',
+    browseButton: '浏览',
+    desktopShortcut: '创建桌面快捷方式',
+    startMenuShortcut: '创建开始菜单快捷方式',
+    launchOnStartup: '开机时自动启动',
+    installingTitle: '正在安装应用程序...',
+    cancelButton: '取消',
+    completedTitle: '安装完成',
+    launchAppCheckbox: '安装完成后立即启动应用',
+    finishButton: '完成',
+    uninstallTitle: '卸载应用程序',
+    purgeUserDataLabel: '删除应用配置与缓存文件',
+    uninstallButton: '立即卸载',
+    runningWarningTitle: '应用程序正在运行',
+    closeAndContinueButton: '关闭应用并继续',
+    backButton: '返回',
+  },
+  ja: {
+    welcomeTitle: 'セットアップへようこそ',
+    welcomeSubtitle: '高速・安全・透明なインストールウィザード。',
+    configureButton: '設定を変更',
+    installNowButton: 'インストール',
+    upgradeNowButton: 'アップデート',
+    repairNowButton: '修復する',
+    installDirectory: 'インストール先フォルダ',
+    browseButton: '参照',
+    desktopShortcut: 'デスクトップにショートカットを作成',
+    startMenuShortcut: 'スタートメニューにショートカットを作成',
+    launchOnStartup: 'Windows起動時に自動実行する',
+    installingTitle: 'インストールしています...',
+    cancelButton: 'キャンセル',
+    completedTitle: 'インストール完了',
+    launchAppCheckbox: '完了後にアプリケーションを起動する',
+    finishButton: '完了',
+    uninstallTitle: 'アンインストール',
+    purgeUserDataLabel: '設定ファイルとキャッシュも削除する',
+    uninstallButton: 'アンインストール',
+    runningWarningTitle: 'アプリケーションが実行中です',
+    closeAndContinueButton: '終了して続行',
+    backButton: '戻る',
+  },
+  ko: {
+    welcomeTitle: '설치 마법사에 오신 것을 환영합니다',
+    welcomeSubtitle: '빠르고 안전하며 투명한 설치 마법사.',
+    configureButton: '설치 옵션 설정',
+    installNowButton: '지금 설치',
+    upgradeNowButton: '지금 업데이트',
+    repairNowButton: '설치 복구',
+    installDirectory: '설치 경로',
+    browseButton: '찾아보기',
+    desktopShortcut: '바탕화면 바로가기 만들기',
+    startMenuShortcut: '시작 메뉴 바로가기 만들기',
+    launchOnStartup: 'Windows 시작 시 자동 실행',
+    installingTitle: '애플리케이션 설치 중...',
+    cancelButton: '취소',
+    completedTitle: '설치 완료',
+    launchAppCheckbox: '설치 종료 후 애플리케이션 실행',
+    finishButton: '마침',
+    uninstallTitle: '애플리케이션 제거',
+    purgeUserDataLabel: '애플리케이션 설정 및 캐시 파일 삭제',
+    uninstallButton: '지금 제거',
+    runningWarningTitle: '애플리케이션이 실행 중입니다',
+    closeAndContinueButton: '종료 후 계속',
+    backButton: '뒤로',
+  },
+  ar: {
+    welcomeTitle: 'مرحبًا بك في معالج التثبيت',
+    welcomeSubtitle: 'تثبيت سريع وآمن وشفاف.',
+    configureButton: 'تخصيص الإعدادات',
+    installNowButton: 'تثبيت الآن',
+    upgradeNowButton: 'ترقية الآن',
+    repairNowButton: 'إصلاح التثبيت',
+    installDirectory: 'مجلد الوجهة',
+    browseButton: 'استعراض',
+    desktopShortcut: 'إنشاء اختصار على سطح المكتب',
+    startMenuShortcut: 'إنشاء اختصار في قائمة ابدأ',
+    launchOnStartup: 'التشغيل تلقائيًا عند بدء تشغيل Windows',
+    installingTitle: 'جارٍ تثبيت التطبيق...',
+    cancelButton: 'إلغاء',
+    completedTitle: 'اكتمل التثبيت',
+    launchAppCheckbox: 'تشغيل التطبيق بعد إغلاق المثبت',
+    finishButton: 'إنهاء',
+    uninstallTitle: 'إلغاء تثبيت التطبيق',
+    purgeUserDataLabel: 'حذف إعدادات التطبيق وملفات الذاكرة المؤقتة',
+    uninstallButton: 'إلغاء التثبيت الآن',
+    runningWarningTitle: 'التطبيق قيد التشغيل حاليًا',
+    closeAndContinueButton: 'إغلاق التطبيق والمتابعة',
+    backButton: 'رجوع',
+  },
+};
+
+export function resolveLocale(rawLocale?: string | null): SupportedLocale {
+  if (!rawLocale) return 'en';
+  const normalized = rawLocale.trim();
+  if (normalized in TRANSLATIONS) {
+    return normalized as SupportedLocale;
+  }
+  const lower = normalized.toLowerCase();
+  if (lower.startsWith('pt')) return 'pt-BR';
+  if (lower.startsWith('zh')) return 'zh-CN';
+  const prefix = lower.split('-')[0];
+  if (prefix in TRANSLATIONS) {
+    return prefix as SupportedLocale;
+  }
+  return 'en';
+}
+
+export function getTranslations(locale?: string | null): InstallerTranslations {
+  return TRANSLATIONS[resolveLocale(locale)];
+}
+
+export function isRtlLocale(locale?: string | null): boolean {
+  return resolveLocale(locale) === 'ar';
+}

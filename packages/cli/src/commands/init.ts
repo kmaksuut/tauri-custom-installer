@@ -2,11 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import pc from 'picocolors';
-import { detectAppConfig } from '../utils/config';
+import { detectAppConfig, detectPackageManager } from '../utils/config';
 
 export interface InitOptions {
   template?: string;
   name?: string;
+  mode?: 'perUser' | 'perMachine' | 'both';
+  yes?: boolean;
   force?: boolean;
 }
 
@@ -56,26 +58,48 @@ function findDirUpwards(startDir: string, subPath: string): string | null {
 
 export async function runInit(options: InitOptions): Promise<void> {
   const cwd = process.cwd();
+  const pm = detectPackageManager(cwd);
   let template = options.template;
+  let installMode: 'perUser' | 'perMachine' | 'both' = options.mode || 'perUser';
 
   if (!template) {
-    const frameworkMap: Record<string, string> = {
-      'React 19 + Tailwind CSS + Lucide (Recommended)': 'react',
-      'Svelte 5 + Tailwind': 'svelte',
-      'Vue 3 + Tailwind': 'vue',
-      'Vanilla HTML/CSS/TypeScript': 'vanilla',
+    if (options.yes) {
+      template = 'react';
+    } else {
+      const frameworkMap: Record<string, string> = {
+        'React 19 + Tailwind CSS + Lucide (Recommended)': 'react',
+        'Svelte 5 + TypeScript': 'svelte',
+        'Vue 3 + TypeScript': 'vue',
+        'Vanilla HTML/CSS/TypeScript': 'vanilla',
+      };
+      const choice = await promptChoice(
+        '\n? Which framework would you like for your custom installer UI?',
+        Object.keys(frameworkMap),
+        0
+      );
+      template = frameworkMap[choice] || 'react';
+    }
+  }
+
+  if (!options.mode && !options.yes && process.stdin.isTTY) {
+    const modeMap: Record<string, 'perUser' | 'perMachine' | 'both'> = {
+      'Per-user (%LOCALAPPDATA%, no UAC prompt, Recommended)': 'perUser',
+      'Per-machine (Program Files, requires Administrator)': 'perMachine',
+      'Both (let the end user choose in UI)': 'both',
     };
-    const choice = await promptChoice(
-      '\n? Which framework would you like for your custom installer UI?',
-      Object.keys(frameworkMap),
+    const modeChoice = await promptChoice(
+      '\n? Which installation scope should be used by default?',
+      Object.keys(modeMap),
       0
     );
-    template = frameworkMap[choice] || 'react';
+    installMode = modeMap[modeChoice] || 'perUser';
   }
 
   const targetDir = path.join(cwd, 'installer');
 
-  console.log(pc.cyan(`\n✨ Initializing Tauri Custom Installer with template: ${pc.bold(template)}`));
+  console.log(
+    pc.cyan(`\n✨ Initializing Tauri Custom Installer with template: ${pc.bold(template)}`)
+  );
 
   if (fs.existsSync(targetDir) && !options.force) {
     console.log(pc.yellow(`⚠️  Directory 'installer/' already exists.`));
@@ -88,10 +112,12 @@ export async function runInit(options: InitOptions): Promise<void> {
     appConfig.appName = options.name;
   }
 
-  // Locate template directory by checking relative locations from CLI __dirname or cwd
-  const templateDir =
-    findDirUpwards(__dirname, path.join('templates', template)) ||
-    findDirUpwards(cwd, path.join('templates', template));
+  // Locate template directory (first inside packaged CLI `templates/`, then upwards in monorepo)
+  const packagedTemplateDir = path.resolve(__dirname, '..', 'templates', template);
+  const templateDir = fs.existsSync(packagedTemplateDir)
+    ? packagedTemplateDir
+    : findDirUpwards(__dirname, path.join('templates', template)) ||
+      findDirUpwards(cwd, path.join('templates', template));
 
   if (!templateDir) {
     console.error(pc.red(`❌ Template '${template}' not found.`));
@@ -99,10 +125,9 @@ export async function runInit(options: InitOptions): Promise<void> {
     process.exit(1);
   }
 
-  // Copy template files recursively
   copyDirSync(templateDir, targetDir);
 
-  // Write installer/src/installer.config.json with real app metadata
+  // Write installer/src/installer.config.json for UI dev server defaults
   const installerConfigPath = path.join(targetDir, 'src', 'installer.config.json');
   const installerConfigData = {
     appName: appConfig.appName,
@@ -115,25 +140,65 @@ export async function runInit(options: InitOptions): Promise<void> {
   fs.mkdirSync(path.dirname(installerConfigPath), { recursive: true });
   fs.writeFileSync(installerConfigPath, JSON.stringify(installerConfigData, null, 2));
 
-  // Determine if cwd is inside the tauri-custom-installer monorepo or an external project
+  // Write root tci.config.json (single source of truth)
+  const tciConfigPath = path.join(cwd, 'tci.config.json');
+  if (!fs.existsSync(tciConfigPath) || options.force) {
+    const tciConfig = {
+      productName: appConfig.appName,
+      identifier: appConfig.identifier,
+      version: appConfig.version,
+      publisher: appConfig.publisher,
+      ui: {
+        root: './installer',
+        outDir: './installer/dist',
+      },
+      install: {
+        mode: installMode,
+        shortcuts: {
+          desktop: true,
+          startMenu: true,
+        },
+        autostart: 'ask',
+        runAfterInstall: true,
+      },
+      compression: 'zstd',
+      output: './dist',
+    };
+    fs.writeFileSync(tciConfigPath, JSON.stringify(tciConfig, null, 2));
+  }
+
+  // Ensure .tci/ and .payload_staging are in .gitignore
+  const gitignorePath = path.join(cwd, '.gitignore');
+  if (fs.existsSync(gitignorePath)) {
+    const gi = fs.readFileSync(gitignorePath, 'utf8');
+    if (!gi.includes('.tci/')) {
+      fs.writeFileSync(gitignorePath, `${gi.trimEnd()}\n.tci/\ninstaller/.payload_staging/\n`);
+    }
+  }
+
+  // Resolve client SDK dependency in installer/package.json
   const monorepoClientDir = findDirUpwards(cwd, path.join('packages', 'client'));
-  const cliBundledClientDir = findDirUpwards(__dirname, path.join('packages', 'client'));
+  const packagedClientDir = path.resolve(__dirname, '..', 'vendor', 'client');
+  const cliBundledClientDir = fs.existsSync(packagedClientDir)
+    ? packagedClientDir
+    : findDirUpwards(__dirname, path.join('packages', 'client'));
 
   const installerPkgPath = path.join(targetDir, 'package.json');
   if (fs.existsSync(installerPkgPath)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(installerPkgPath, 'utf8'));
+      const appSlug = appConfig.appName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+      pkg.name = `${appSlug}-installer-ui`;
       if (pkg.dependencies) {
         if (monorepoClientDir) {
           const clientRelPath = path.relative(targetDir, monorepoClientDir).replace(/\\/g, '/');
           pkg.dependencies['@tauri-custom-installer/client'] = `file:${clientRelPath}`;
         } else if (cliBundledClientDir) {
-          // External project: vendor client SDK into installer/.tci-sdk/client for offline/git installs
           const vendoredClientDir = path.join(targetDir, '.tci-sdk', 'client');
           copyDirSync(cliBundledClientDir, vendoredClientDir);
           pkg.dependencies['@tauri-custom-installer/client'] = 'file:./.tci-sdk/client';
         } else {
-          pkg.dependencies['@tauri-custom-installer/client'] = '^0.1.0';
+          pkg.dependencies['@tauri-custom-installer/client'] = '^0.2.0';
         }
       }
       fs.writeFileSync(installerPkgPath, JSON.stringify(pkg, null, 2));
@@ -142,15 +207,20 @@ export async function runInit(options: InitOptions): Promise<void> {
     }
   }
 
-  // Customize installer/src-tauri/Cargo.toml
+  // Customize installer/src-tauri/Cargo.toml if present
   const monorepoCoreDir = findDirUpwards(cwd, path.join('packages', 'core'));
-  const cliBundledCoreDir = findDirUpwards(__dirname, path.join('packages', 'core'));
+  const packagedCoreDir = path.resolve(__dirname, '..', 'vendor', 'core');
+  const cliBundledCoreDir = fs.existsSync(packagedCoreDir)
+    ? packagedCoreDir
+    : findDirUpwards(__dirname, path.join('packages', 'core'));
 
   const installerCargoPath = path.join(targetDir, 'src-tauri', 'Cargo.toml');
   if (fs.existsSync(installerCargoPath)) {
     try {
       let cargoStr = fs.readFileSync(installerCargoPath, 'utf8');
-      const cargoPkgName = `${appConfig.appName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-installer`;
+      const cargoPkgName = `${appConfig.appName
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '-')}-installer`;
       cargoStr = cargoStr.replace(
         /name\s*=\s*"tauri-custom-installer-template-[^"]*"/,
         `name = "${cargoPkgName}"`
@@ -160,9 +230,21 @@ export async function runInit(options: InitOptions): Promise<void> {
         const coreRelPath = path
           .relative(path.join(targetDir, 'src-tauri'), monorepoCoreDir)
           .replace(/\\/g, '/');
-        cargoStr = cargoStr.replace(/path\s*=\s*"[^"]*packages\/core"/g, `path = "${coreRelPath}"`);
+        cargoStr = cargoStr.replace(
+          /path\s*=\s*"[^"]*packages\/core"/g,
+          `path = "${coreRelPath}"`
+        );
+        const rootCargo = path.join( path.dirname( path.dirname(monorepoCoreDir) ), 'Cargo.toml');
+        const relMember = path
+          .relative(path.dirname(rootCargo), path.join(targetDir, 'src-tauri'))
+          .replace(/\\/g, '/');
+        if (fs.existsSync(rootCargo)) {
+          const rootCargoText = fs.readFileSync(rootCargo, 'utf8');
+          if (!rootCargoText.includes(relMember) && !cargoStr.includes('[workspace]')) {
+            cargoStr += '\n[workspace]\n';
+          }
+        }
       } else if (cliBundledCoreDir) {
-        // External project: vendor core crate into installer/src-tauri/core and isolate workspace
         const vendoredCoreDir = path.join(targetDir, 'src-tauri', 'core');
         copyDirSync(cliBundledCoreDir, vendoredCoreDir);
         cargoStr = cargoStr.replace(/path\s*=\s*"[^"]*packages\/core"/g, `path = "./core"`);
@@ -184,9 +266,25 @@ export async function runInit(options: InitOptions): Promise<void> {
       conf.productName = `${appConfig.appName} Setup`;
       conf.identifier = `${appConfig.identifier}.installer`;
       conf.version = appConfig.version;
+      if (conf.bundle) {
+        conf.bundle.active = false;
+        conf.bundle.targets = [];
+      }
       fs.writeFileSync(tauriConfPath, JSON.stringify(conf, null, 2));
     } catch {
       // ignore
+    }
+  }
+
+  // Copy user's app icons into installer/src-tauri/icons if present
+  const userIconsDir = path.join(cwd, 'src-tauri', 'icons');
+  const installerIconsDir = path.join(targetDir, 'src-tauri', 'icons');
+  if (fs.existsSync(userIconsDir) && fs.existsSync(installerIconsDir)) {
+    for (const iconFile of ['icon.ico', '32x32.png', '128x128.png', '128x128@2x.png']) {
+      const srcIcon = path.join(userIconsDir, iconFile);
+      if (fs.existsSync(srcIcon)) {
+        fs.copyFileSync(srcIcon, path.join(installerIconsDir, iconFile));
+      }
     }
   }
 
@@ -209,12 +307,19 @@ export async function runInit(options: InitOptions): Promise<void> {
     }
   }
 
-  console.log(pc.green(`✔ Synced application metadata (${appConfig.appName} v${appConfig.version}) into installer/src/installer.config.json`));
+  const installCmd = pm === 'bun' ? 'bun install' : `${pm} install`;
+  const runCmd = pm === 'bun' ? 'bun run' : `${pm} run`;
+
+  console.log(
+    pc.green(
+      `✔ Created tci.config.json & synced metadata (${appConfig.appName} v${appConfig.version})`
+    )
+  );
   console.log(pc.green(`\n✔ Custom installer initialized successfully in ./installer/`));
   console.log(pc.cyan(`\nNext steps:`));
-  console.log(`  1. ${pc.bold('cd installer && bun install')} (or npm install)`);
-  console.log(`  2. ${pc.bold('bun run installer:dev')} (to preview & customize your installer UI)`);
-  console.log(`  3. ${pc.bold('bun run installer:build')} (to compile your standalone setup .exe)\n`);
+  console.log(`  1. ${pc.bold(`cd installer && ${installCmd}`)}`);
+  console.log(`  2. ${pc.bold(`${runCmd} installer:dev`)} (live UI preview with HMR & simulator)`);
+  console.log(`  3. ${pc.bold(`${runCmd} installer:build`)} (compile standalone setup .exe)\n`);
 }
 
 function copyDirSync(src: string, dest: string) {
@@ -229,7 +334,10 @@ function copyDirSync(src: string, dest: string) {
       entry.name === 'node_modules' ||
       entry.name === 'target' ||
       entry.name === 'dist' ||
-      entry.name === '.git'
+      entry.name === '.git' ||
+      entry.name === 'bun.lock' ||
+      entry.name === 'bun.lockb' ||
+      entry.name === 'gen'
     ) {
       continue;
     }

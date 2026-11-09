@@ -1,6 +1,6 @@
 {
   "name": "tauri-custom-installer-template-svelte",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,11 +10,11 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
-    "@tauri-custom-installer/client": "workspace:*",
+    "@tauri-custom-installer/client": "file:../../packages/client",
     "svelte": "^5.0.0"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
   }

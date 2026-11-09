@@ -1,20 +1,26 @@
 import { useCallback, useState } from 'react';
-import { InstallerApi } from '../api';
+import { InstallerApi, parseStructuredError } from '../api';
 import type {
   RunningProcessInfo,
+  StructuredError,
   UninstallProgress,
   UninstallStep,
 } from '../types';
 
 export interface UseUninstallConfig {
-  appId: string;
-  appName: string;
-  executableName: string;
-  installDir: string;
+  appId?: string;
+  appName?: string;
+  executableName?: string;
+  installDir?: string;
 }
 
-export function useUninstall(config: UseUninstallConfig) {
-  const { appId, appName, executableName, installDir } = config;
+export function useUninstall(config: UseUninstallConfig = {}) {
+  const {
+    appId = 'com.tauri.app',
+    appName = 'Tauri Application',
+    executableName = 'app.exe',
+    installDir = '',
+  } = config;
 
   const [step, setStep] = useState<UninstallStep>('confirm');
   const [purgeUserData, setPurgeUserData] = useState<boolean>(false);
@@ -26,27 +32,15 @@ export function useUninstall(config: UseUninstallConfig) {
   const [runningProcesses, setRunningProcesses] = useState<RunningProcessInfo>({
     is_running: false,
     process_ids: [],
+    process_names: [],
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const startUninstall = useCallback(async () => {
-    try {
-      const running = await InstallerApi.checkRunning(executableName);
-      if (running.is_running) {
-        setRunningProcesses(running);
-        setStep('running_warning');
-        return;
-      }
-      await performUninstall();
-    } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
-      setStep('error');
-    }
-  }, [executableName, installDir]);
+  const [structuredError, setStructuredError] = useState<StructuredError | null>(null);
 
   const performUninstall = useCallback(async () => {
     setStep('uninstalling');
     setErrorMessage(null);
+    setStructuredError(null);
 
     try {
       await InstallerApi.startUninstallation(
@@ -63,22 +57,45 @@ export function useUninstall(config: UseUninstallConfig) {
       );
       setStep('completed');
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      const parsed = parseStructuredError(err);
+      setErrorMessage(parsed.message);
+      setStructuredError(parsed);
       setStep('error');
     }
   }, [appId, installDir, purgeUserData, appName, executableName]);
 
-  const terminateRunningAndUninstall = useCallback(async () => {
+  const startUninstall = useCallback(async () => {
     try {
-      if (runningProcesses.process_ids.length > 0) {
-        await InstallerApi.killRunning(runningProcesses.process_ids);
+      const running = await InstallerApi.checkRunning(executableName, installDir);
+      if (running.is_running) {
+        setRunningProcesses(running);
+        setStep('running_warning');
+        return;
       }
       await performUninstall();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
+      const parsed = parseStructuredError(err);
+      setErrorMessage(parsed.message);
+      setStructuredError(parsed);
       setStep('error');
     }
-  }, [runningProcesses, performUninstall]);
+  }, [executableName, installDir, performUninstall]);
+
+  const terminateRunningAndUninstall = useCallback(async () => {
+    try {
+      await InstallerApi.killRunning(
+        runningProcesses.process_ids,
+        executableName,
+        installDir
+      );
+      await performUninstall();
+    } catch (err: unknown) {
+      const parsed = parseStructuredError(err);
+      setErrorMessage(parsed.message);
+      setStructuredError(parsed);
+      setStep('error');
+    }
+  }, [runningProcesses, executableName, installDir, performUninstall]);
 
   const exit = useCallback(async () => {
     await InstallerApi.exitInstaller();
@@ -92,6 +109,7 @@ export function useUninstall(config: UseUninstallConfig) {
     progress,
     runningProcesses,
     errorMessage,
+    structuredError,
     startUninstall,
     terminateRunningAndUninstall,
     exit,

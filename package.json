@@ -1,22 +1,25 @@
 {
   "name": "tauri-custom-installer-monorepo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Custom, modern, web-based installers for Tauri v2 applications",
   "type": "module",
   "workspaces": [
     "packages/*",
-    "templates/*",
-    "examples/*"
+    "templates/*"
   ],
   "scripts": {
-    "build": "bun run --filter \"*\" build",
-    "test": "bun run --filter \"*\" test",
-    "lint": "bun run --filter \"*\" lint",
-    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
+    "build": "npm --prefix packages/client run build && npm --prefix packages/cli run build",
+    "test": "npm --prefix packages/client run test && cargo test --package tauri-custom-installer-core",
+    "test:rust": "cargo test --package tauri-custom-installer-core",
+    "test:client": "npm --prefix packages/client run test"
   },
   "devDependencies": {
     "typescript": "^5.7.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tauri-custom-installer/tauri-custom-installer.git"
   },
   "keywords": [
     "tauri",
@@ -29,6 +32,6 @@
     "windows-installer",
     "desktop"
   ],
-  "author": "Antigravity Team & Community",
+  "author": "Tauri Custom Installer Contributors",
   "license": "MIT"
 }

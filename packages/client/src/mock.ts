@@ -1,8 +1,10 @@
 import type {
+  AppManifest,
   InstallOptions,
   InstallProgress,
   PathValidation,
   RunningProcessInfo,
+  SimulationScenario,
   SystemInfo,
   UninstallOptions,
   UninstallProgress,
@@ -26,72 +28,216 @@ const DUMMY_FILES = [
   'app/uninstall.exe',
 ];
 
+const MOCK_FOLDER_CHOICES = [
+  'C:\\Users\\Developer\\AppData\\Local\\MyApp',
+  'D:\\Apps\\MyApp',
+  'C:\\Tools\\MyApp',
+];
+
 export function isTauriEnvironment(): boolean {
   if (typeof window === 'undefined') return false;
   return Boolean(
     (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ ||
-    (window as unknown as { __TAURI__?: unknown }).__TAURI__
+      (window as unknown as { __TAURI__?: unknown }).__TAURI__
   );
 }
 
 export class MockInstallerDriver {
   private static cancelRequested = false;
+  private static currentScenario: SimulationScenario = 'success';
+  private static folderChoiceIndex = 0;
+  private static stepDelayMs = 120;
 
-  static getSystemInfo(appName: string, _appId: string, _requiredBytes: number): SystemInfo {
-    const isUninstallUrl =
-      typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('mode') === 'uninstall';
+  static setScenario(scenario: SimulationScenario): void {
+    this.currentScenario = scenario;
+  }
+
+  static getScenario(): SimulationScenario {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('scenario') as SimulationScenario | null;
+      if (fromUrl) return fromUrl;
+      if (params.get('mode') === 'uninstall') return 'uninstall';
+    }
+    return this.currentScenario;
+  }
+
+  static setStepDelay(ms: number): void {
+    this.stepDelayMs = Math.max(0, ms);
+  }
+
+  static getSystemInfo(
+    appName = 'Tauri Application',
+    appId = 'com.tauri.app',
+    requiredBytes = 50 * 1024 * 1024
+  ): SystemInfo {
+    const scenario = this.getScenario();
+    const isUninstall = scenario === 'uninstall';
+    const isUpgrade = scenario === 'already_installed_upgrade';
+    const isRepair = scenario === 'repair';
+    const isDowngrade = scenario === 'downgrade';
+
+    const manifest: AppManifest = {
+      appName,
+      appId,
+      version: '1.2.0',
+      publisher: 'Tauri Developer',
+      executableName: `${appName.toLowerCase().replace(/\s+/g, '-')}.exe`,
+      installMode: 'perUser',
+      defaultInstallDir: null,
+      allowDowngrade: false,
+      createDesktopShortcut: true,
+      createStartMenuShortcut: true,
+      startMenuFolder: null,
+      autostart: 'ask',
+      runAfterInstall: true,
+      licenseText: null,
+      uncompressedSizeBytes: requiredBytes,
+      compressedSizeBytes: Math.floor(requiredBytes * 0.38),
+      fileCount: DUMMY_FILES.length,
+      payloadSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      payloadFormat: 'tar.zst',
+      urlSchemes: [],
+      fileAssociations: [],
+      components: [],
+      aboutUrl: null,
+      helpUrl: null,
+      updateUrl: null,
+      addToPath: false,
+    };
+
+    const availableSpace =
+      scenario === 'insufficient_space'
+        ? Math.max(1024 * 1024, Math.floor(requiredBytes / 4))
+        : 184 * 1024 * 1024 * 1024;
 
     return {
-      default_install_path: `C:\\Users\\Developer\\AppData\\Local\\Programs\\${appName}`,
+      default_install_path: `C:\\Users\\Developer\\AppData\\Local\\${appName}`,
       program_files_path: `C:\\Program Files\\${appName}`,
       desktop_path: 'C:\\Users\\Developer\\Desktop',
-      start_menu_path: 'C:\\Users\\Developer\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs',
-      available_space_bytes: 184 * 1024 * 1024 * 1024, // 184 GB
+      start_menu_path:
+        'C:\\Users\\Developer\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs',
+      available_space_bytes: availableSpace,
+      required_space_bytes: requiredBytes,
       is_elevated: false,
-      is_already_installed: false,
-      existing_version: null,
-      existing_install_path: null,
-      is_uninstall_mode: isUninstallUrl,
+      is_already_installed: isUpgrade || isRepair || isDowngrade || isUninstall,
+      existing_version: isUpgrade
+        ? '1.0.0'
+        : isRepair
+          ? '1.2.0'
+          : isDowngrade
+            ? '2.0.0'
+            : null,
+      existing_install_path:
+        isUpgrade || isRepair || isDowngrade || isUninstall
+          ? `C:\\Users\\Developer\\AppData\\Local\\${appName}`
+          : null,
+      existing_install_scope: 'perUser',
+      action: isUpgrade
+        ? 'upgrade'
+        : isRepair
+          ? 'repair'
+          : isDowngrade
+            ? 'downgrade'
+            : 'install',
+      is_uninstall_mode: isUninstall,
+      is_passive_mode: false,
+      locale: typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US',
+      webview2_version: '131.0.2903.86',
+      manifest,
     };
   }
 
   static validateInstallPath(path: string, requiredBytes: number): PathValidation {
-    if (!path || path.trim().length === 0) {
+    const scenario = this.getScenario();
+    const trimmed = (path || '').trim();
+    if (!trimmed) {
       return {
         is_valid: false,
         is_writable: false,
         has_enough_space: false,
         available_bytes: 0,
-        error_message: 'Path cannot be empty.',
+        required_bytes: requiredBytes,
+        normalized_path: '',
+        error_code: 'INVALID_PATH',
+        error_message: 'Installation path cannot be empty.',
       };
     }
 
-    const available = 184 * 1024 * 1024 * 1024;
+    const lower = trimmed.toLowerCase().replace(/\//g, '\\').replace(/\\+$/, '');
+    if (
+      lower === 'c:' ||
+      lower === 'c:\\windows' ||
+      lower.startsWith('c:\\windows\\') ||
+      lower === 'c:\\program files'
+    ) {
+      return {
+        is_valid: false,
+        is_writable: false,
+        has_enough_space: false,
+        available_bytes: 0,
+        required_bytes: requiredBytes,
+        normalized_path: trimmed,
+        error_code: 'INVALID_PATH',
+        error_message: 'Cannot install directly into a protected system root directory.',
+      };
+    }
+
+    if (scenario === 'permission_denied') {
+      return {
+        is_valid: false,
+        is_writable: false,
+        has_enough_space: true,
+        available_bytes: 184 * 1024 * 1024 * 1024,
+        required_bytes: requiredBytes,
+        normalized_path: trimmed,
+        error_code: 'ACCESS_DENIED',
+        error_message:
+          'Target directory is not writable. Choose a user-writable folder or run as Administrator.',
+      };
+    }
+
+    const available =
+      scenario === 'insufficient_space'
+        ? Math.max(1024 * 1024, Math.floor(requiredBytes / 4))
+        : 184 * 1024 * 1024 * 1024;
+    const enough = available >= requiredBytes;
+
     return {
-      is_valid: available >= requiredBytes,
+      is_valid: enough,
       is_writable: true,
-      has_enough_space: available >= requiredBytes,
+      has_enough_space: enough,
       available_bytes: available,
-      error_message: available >= requiredBytes ? null : 'Insufficient disk space.',
+      required_bytes: requiredBytes,
+      normalized_path: trimmed,
+      error_code: enough ? null : 'INSUFFICIENT_SPACE',
+      error_message: enough ? null : 'Insufficient disk space on target drive.',
     };
   }
 
-  static async selectFolder(initialPath?: string): Promise<string | null> {
-    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-      const selected = window.prompt(
-        '[Simulation Mode] Enter or confirm destination folder path:',
-        initialPath || 'C:\\Users\\Developer\\AppData\\Local\\Programs\\MyApp'
+  static async selectFolder(initialPath?: string, appName = 'MyApp'): Promise<string | null> {
+    // Cycles through realistic destination folders without calling blocking `window.prompt`
+    const chosen =
+      MOCK_FOLDER_CHOICES[this.folderChoiceIndex % MOCK_FOLDER_CHOICES.length].replace(
+        'MyApp',
+        appName || 'MyApp'
       );
-      return selected && selected.trim().length > 0 ? selected.trim() : null;
-    }
-    return initialPath || null;
+    this.folderChoiceIndex++;
+    return chosen || initialPath || null;
   }
 
   static checkRunning(_executableName: string): RunningProcessInfo {
+    if (this.getScenario() === 'app_running') {
+      return {
+        is_running: true,
+        process_ids: [4820, 9104],
+        process_names: [_executableName || 'app.exe'],
+      };
+    }
     return {
       is_running: false,
       process_ids: [],
+      process_names: [],
     };
   }
 
@@ -104,17 +250,45 @@ export class MockInstallerDriver {
     onProgress: (prog: InstallProgress) => void
   ): Promise<void> {
     this.cancelRequested = false;
+    const scenario = this.getScenario();
+
+    if (scenario === 'corrupted_payload') {
+      onProgress({
+        stage: 'verifying',
+        current_file: 'Verifying payload integrity (SHA-256)...',
+        files_completed: 0,
+        total_files: DUMMY_FILES.length,
+        bytes_extracted: 0,
+        total_bytes: 128 * 1024 * 1024,
+        speed_bps: 0,
+        eta_seconds: 0,
+        percent: 2,
+      });
+      await new Promise((resolve) => setTimeout(resolve, this.stepDelayMs));
+      throw new Error(
+        'CORRUPTED: Installer payload integrity check (SHA-256) failed. Please re-download the installer.'
+      );
+    }
+
+    if (scenario === 'downgrade') {
+      throw new Error('DOWNGRADE_BLOCKED: Newer version (2.0.0) is already installed.');
+    }
+
     const totalFiles = DUMMY_FILES.length;
-    const totalBytes = 128 * 1024 * 1024; // 128 MB
+    const totalBytes = 128 * 1024 * 1024;
+    const delay = scenario === 'slow_disk' ? this.stepDelayMs * 3 : this.stepDelayMs;
+    const speedBps = scenario === 'slow_disk' ? 8 * 1024 * 1024 : 64 * 1024 * 1024;
 
     for (let i = 0; i < totalFiles; i++) {
       if (this.cancelRequested) {
-        throw new Error('Installation cancelled by user.');
+        throw new Error('CANCELLED: Installation cancelled by user.');
       }
 
       const file = DUMMY_FILES[i];
       const progressPercent = ((i + 1) / totalFiles) * 95;
       const bytesExtracted = Math.floor((progressPercent / 100) * totalBytes);
+      const remainingBytes = Math.max(0, totalBytes - bytesExtracted);
+      const etaSeconds = Math.ceil(remainingBytes / speedBps);
 
       onProgress({
         stage: 'extracting',
@@ -123,28 +297,30 @@ export class MockInstallerDriver {
         total_files: totalFiles,
         bytes_extracted: bytesExtracted,
         total_bytes: totalBytes,
+        speed_bps: speedBps,
+        eta_seconds: etaSeconds,
         percent: Math.round(progressPercent),
       });
 
-      // Realistic file extraction delay
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
     if (this.cancelRequested) {
-      throw new Error('Installation cancelled by user.');
+      throw new Error('CANCELLED: Installation cancelled by user.');
     }
 
-    // Creating shortcuts & registry
     onProgress({
       stage: 'creating_shortcuts',
-      current_file: 'Creating system shortcuts...',
+      current_file: 'Creating system shortcuts (with AppUserModelID)...',
       files_completed: totalFiles,
       total_files: totalFiles,
       bytes_extracted: totalBytes,
       total_bytes: totalBytes,
+      speed_bps: speedBps,
+      eta_seconds: 0,
       percent: 98,
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     onProgress({
       stage: 'finished',
@@ -153,26 +329,57 @@ export class MockInstallerDriver {
       total_files: totalFiles,
       bytes_extracted: totalBytes,
       total_bytes: totalBytes,
+      speed_bps: speedBps,
+      eta_seconds: 0,
       percent: 100,
     });
   }
 
   static async simulateUninstallation(
-    _options: UninstallOptions,
+    options: UninstallOptions,
     appName: string,
     onProgress: (prog: UninstallProgress) => void
   ): Promise<void> {
-    const stages = [
-      { stage: 'closing_process', percent: 20, message: `Checking for running instances of ${appName}...` },
-      { stage: 'removing_shortcuts', percent: 45, message: 'Removing shortcuts from Desktop & Start Menu...' },
-      { stage: 'removing_registry', percent: 70, message: 'Removing Windows Registry entries...' },
-      { stage: 'deleting_files', percent: 90, message: 'Removing application files...' },
-      { stage: 'finished', percent: 100, message: `${appName} successfully uninstalled.` },
+    const stages: UninstallProgress[] = [
+      {
+        stage: 'closing_process',
+        percent: 15,
+        message: `Closing running instances of ${appName}...`,
+      },
+      {
+        stage: 'deleting_files',
+        percent: 45,
+        message: 'Removing installed files listed in .tci/manifest.json...',
+      },
+      ...(options.purge_user_data
+        ? [
+            {
+              stage: 'purging_data',
+              percent: 65,
+              message: 'Removing application settings and WebView2 cache...',
+            },
+          ]
+        : []),
+      {
+        stage: 'removing_shortcuts',
+        percent: 82,
+        message: 'Removing shortcuts from Desktop & Start Menu...',
+      },
+      {
+        stage: 'removing_registry',
+        percent: 94,
+        message: 'Removing Windows Registry entries...',
+      },
+      {
+        stage: 'finished',
+        percent: 100,
+        message: `${appName} was cleanly uninstalled.`,
+      },
     ];
 
     for (const s of stages) {
       onProgress(s);
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, this.stepDelayMs));
     }
   }
 }

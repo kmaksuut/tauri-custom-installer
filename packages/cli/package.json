@@ -1,19 +1,31 @@
 {
   "name": "tauri-custom-installer",
-  "version": "0.1.0",
-  "description": "CLI toolkit to generate, develop, and build modern custom installers for Tauri v2",
+  "version": "0.2.0",
+  "description": "CLI toolkit and SDK to generate, develop, and build modern custom installers for Tauri v2",
   "bin": {
     "tci": "./dist/index.js",
     "tauri-custom-installer": "./dist/index.js"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "files": [
     "dist",
-    "templates"
+    "templates",
+    "vendor"
   ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/bundle-assets.cjs",
+    "prepack": "npm run build",
     "test": "bun test"
   },
   "dependencies": {
@@ -26,5 +38,20 @@
     "@types/node": "^22.13.1",
     "typescript": "^5.7.3"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tauri-custom-installer/tauri-custom-installer.git"
+  },
+  "keywords": [
+    "tauri",
+    "tauri-v2",
+    "installer",
+    "setup",
+    "nsis",
+    "windows",
+    "react",
+    "svelte",
+    "vue"
+  ],
   "license": "MIT"
 }

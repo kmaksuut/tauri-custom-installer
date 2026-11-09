@@ -1,7 +1,7 @@
 {
   "name": "@tauri-custom-installer/client",
-  "version": "0.1.0",
-  "description": "Client SDK and React hooks for Tauri v2 custom installers",
+  "version": "0.2.0",
+  "description": "Framework-agnostic Client SDK and adapters (React, Svelte, Vue, Solid, Vanilla) for Tauri v2 custom installers",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,6 +17,24 @@
       "import": "./dist/react/index.js",
       "require": "./dist/react/index.js",
       "default": "./dist/react/index.js"
+    },
+    "./svelte": {
+      "types": "./dist/svelte/index.d.ts",
+      "import": "./dist/svelte/index.js",
+      "require": "./dist/svelte/index.js",
+      "default": "./dist/svelte/index.js"
+    },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue/index.js",
+      "require": "./dist/vue/index.js",
+      "default": "./dist/vue/index.js"
+    },
+    "./solid": {
+      "types": "./dist/solid/index.d.ts",
+      "import": "./dist/solid/index.js",
+      "require": "./dist/solid/index.js",
+      "default": "./dist/solid/index.js"
     }
   },
   "files": [
@@ -31,6 +49,9 @@
     "react": ">=18.0.0"
   },
   "peerDependenciesMeta": {
+    "@tauri-apps/api": {
+      "optional": true
+    },
     "react": {
       "optional": true
     }
@@ -41,5 +62,19 @@
     "react": "^19.0.0",
     "typescript": "^5.7.3"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tauri-custom-installer/tauri-custom-installer.git"
+  },
+  "keywords": [
+    "tauri",
+    "installer",
+    "windows",
+    "nsis",
+    "react",
+    "svelte",
+    "vue",
+    "solid"
+  ],
   "license": "MIT"
 }

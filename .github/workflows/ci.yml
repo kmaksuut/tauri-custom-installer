@@ -8,37 +8,56 @@ on:
 
 jobs:
   test-rust:
-    name: Rust Core Tests
+    name: Rust Core & Workspace Check
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Run Core Tests
+      - name: Run Core Integration Tests
         run: cargo test --package tauri-custom-installer-core
 
-  test-client:
-    name: TypeScript Client Tests
+  test-client-and-cli:
+    name: TypeScript Client SDK & CLI
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - name: Install & Run Client Tests
+      - name: Build & Test Client SDK and CLI
         run: |
           cd packages/client
           bun install
+          bun run build
           bun test
+          cd ../cli
+          bun install
           bun run build
 
   build-templates:
-    name: Template Frontend Builds
+    name: Template Frontend Builds (React, Svelte, Vue, Vanilla)
+    needs: test-client-and-cli
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      - name: Build Client SDK
+        run: |
+          cd packages/client
+          bun install
+          bun run build
       - name: Build React Template
         run: |
           cd templates/react
+          bun install
+          bun run build
+      - name: Build Svelte 5 Template
+        run: |
+          cd templates/svelte
+          bun install
+          bun run build
+      - name: Build Vue 3 Template
+        run: |
+          cd templates/vue
           bun install
           bun run build
       - name: Build Vanilla Template

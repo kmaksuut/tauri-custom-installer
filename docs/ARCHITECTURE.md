@@ -1,117 +1,71 @@
 # Architecture & Technical Deep Dive
 
-`tauri-custom-installer` enables desktop developers to build modern, animated, branded installer wizards for **Tauri v2** using Web technologies (**React, Svelte, Vue, Vanilla HTML/CSS/JS**) instead of outdated Win32 NSIS dialogues.
+`tauri-custom-installer` enables desktop developers to build modern, animated, branded installer wizards for **Tauri v2** using standard web technologies (**React, Svelte 5, Vue 3, Solid, Vanilla HTML/CSS/TS**) with full NSIS/MSI feature parity.
 
 ---
 
-## 1. High-Level Concept
+## 1. Appended Single-File SFX Layout (`TciFooter`)
 
-Traditional installers (NSIS/WiX) execute native scripts that render legacy Win32 user interfaces. In contrast, `tauri-custom-installer` uses Tauri itself as the installer execution engine:
+Every setup executable produced by `tci build` uses a deterministic appended layout:
 
-1. **The Setup Executable (`MyApp-Setup.exe`)**:
-   A borderless, fixed-dimension (680×450) Tauri v2 application.
-2. **The Embedded Payload**:
-   The compiled release files of the main desktop application are archived into an optimized `app_payload.zip` and bundled with the installer.
-3. **The Core Engine (`tauri-custom-installer-core`)**:
-   A Rust plugin handling high-speed archive extraction, chunk-by-chunk progress reporting, Windows Registry keys, Shell shortcuts, and safe process termination.
-4. **The Client SDK (`@tauri-custom-installer/client`)**:
-   A TypeScript abstraction with React hooks (`useInstaller`, `useUninstall`) and an in-browser Mock Simulation Engine.
-
----
-
-## 2. Extraction Pipeline & Progress Streaming
-
-```
-[Embedded app_payload.zip] 
-            │
-            ▼
-    [ZipArchive Reader]
-            │
-            ├─► Sanitize paths (Anti Zip-Slip protection)
-            ├─► Stream decompression in 64 KB chunks
-            │
-            ▼
- [Destination Directory]
-  (e.g., %LOCALAPPDATA%\Programs\MyApp)
-            │
-            ▼
- [Tauri IPC Channel] ──► Webview UI (Real-time percentage & file name)
+```text
+┌───────────────────────────┬──────────────────┬────────────────────────┬───────────────────┬──────────────────────────┐
+│  tci-runtime.exe          │  ui.zip          │  app_payload.tar.zst   │  manifest.json    │  TciFooter (136 bytes)   │
+│  (Native Tauri v2 Stub)   │  (Compiled Web)  │  (Zstandard Solid Tar) │  (AppManifest)    │  Offsets + SHA-256 + Magic│
+└───────────────────────────┴──────────────────┴────────────────────────┴───────────────────┴──────────────────────────┘
 ```
 
-The installer leverages Tauri v2's scoped `Channel<InstallProgress>` mechanism. Rather than flooding a global event bus, progress updates stream directly from the extraction thread to the webview:
-
-- `stage`: `"extracting"` | `"creating_shortcuts"` | `"registering"` | `"finished"`
-- `current_file`: File path currently being written
-- `percent`: Calculated from uncompressed byte counts
-- `bytes_extracted` vs `total_bytes`
+1. **Constant-Memory Streaming (`SectionReader`)**:
+   At runtime, the installer opens its own executable (`std::env::current_exe()`), locates `TciFooter` (scanning backwards up to 128 KB if an Authenticode signature table is appended after the footer), verifies the 256-bit SHA-256 digest in 64 KB chunks, and streams `app_payload.tar.zst` directly into the Zstandard + Tar decoder without loading the archive into RAM.
+2. **Stripped Uninstaller (`write_stripped_uninstaller`)**:
+   When writing `<installDir>\uninstall.exe`, the runtime copies `[tci-runtime.exe][ui.zip][manifest.json][TciFooter (payload_size = 0)]`, omitting `app_payload.tar.zst`. This preserves the developer's custom uninstaller UI while keeping `uninstall.exe` at ~2.5 MB regardless of how large the application payload is.
 
 ---
 
-## 3. Windows Integration & Add/Remove Programs
+## 2. Transactional Extraction, Differential Upgrades & Rollback
 
-### 3.1 Registry Keys
-To integrate seamlessly with **Windows Settings $\rightarrow$ Installed Apps** (Add/Remove Programs), the installer writes the following keys under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\<AppId>`:
-
-| Key | Type | Value | Purpose |
-| :--- | :--- | :--- | :--- |
-| `DisplayName` | `REG_SZ` | `My Awesome App` | Application name displayed in Windows Settings |
-| `DisplayVersion`| `REG_SZ` | `1.0.0` | Application version |
-| `Publisher` | `REG_SZ` | `Developer Name` | Company or author name |
-| `DisplayIcon` | `REG_SZ` | `C:\...\MyApp.exe,0` | Icon shown in Installed Apps |
-| `InstallLocation`| `REG_SZ` | `C:\...\MyApp` | Installation directory |
-| `UninstallString`| `REG_SZ` | `"C:\...\uninstall.exe"` | Command invoked when user clicks Uninstall |
-| `QuietUninstallString`| `REG_SZ` | `"C:\...\uninstall.exe" /S`| Silent uninstallation command |
-| `EstimatedSize`| `REG_DWORD`| Size in KB | Disk footprint reported to Windows |
-| `NoModify` | `REG_DWORD`| `1` | Disables "Modify" button |
-| `NoRepair` | `REG_DWORD`| `1` | Disables "Repair" button |
-
-### 3.2 Auto-Start with Windows
-If the user consents to launch the app on Windows startup, a registry value is added to:
-`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` $\rightarrow$ `"<ExecutablePath>"`.
-
-### 3.3 Shell Shortcuts (.lnk)
-Shortcuts are created using the Windows Shell COM engine (`IShellLinkW` / `WScript.Shell`):
-- **Desktop**: `%USERPROFILE%\Desktop\<AppName>.lnk`
-- **Start Menu**: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\<AppName>.lnk`
-
----
-
-## 4. Uninstallation Architecture & Self-Cleanup
-
-On Windows, an executable file is locked by the OS kernel while running and **cannot delete itself**.
-
-`tauri-custom-installer` solves this using a two-stage worker process:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant Main as uninstall.exe (App Folder)
-    participant Worker as Temp Worker (%TEMP%)
-    participant OS as Windows Filesystem & Registry
-
-    User->>Main: Launches uninstall.exe
-    Main->>User: Displays confirmation & options
-    User->>Main: Confirms Uninstallation
-    Main->>OS: Checks & closes active application instances
-    Main->>OS: Removes Desktop & Start Menu shortcuts
-    Main->>OS: Removes Registry entries (Add/Remove Programs)
-    Main->>Worker: Copies self to %TEMP%\<appid>-worker.exe
-    Main->>Worker: Spawns worker with --worker-cleanup flag
-    Main->>Main: Terminates original uninstall.exe process
-    Note over Worker: Waits 1.2s for uninstall.exe lock to release
-    Worker->>OS: Deletes all files in <InstallLocation>
-    Worker->>OS: Self-deletes via delayed cmd loop
+```
+[Appended app_payload.tar.zst / .zip]
+            │
+            ├─► Verify SHA-256 digest (abort with CORRUPTED code on mismatch)
+            ├─► Sanitize paths (block .., ADS ':', CON/NUL, symlinks)
+            ├─► Back up existing files into .tci-backup during in-place upgrade
+            ├─► Stream decompression & compute per-file SHA-256
+            ├─► Throttle progress events to 30 Hz (with speed_bps & eta_seconds)
+            │
+            ▼
+  [Write <installDir>\.tci\manifest.json]
+  [Remove stale files from previous version's manifest]
 ```
 
+If the user cancels installation or an I/O error occurs mid-extraction:
+- Newly created files are deleted.
+- Overwritten files are restored from `.tci-backup`.
+- Pre-existing unrelated files in the target folder are never touched.
+
 ---
 
-## 5. Mock Simulation Engine for UI Design
+## 3. Native Win32 COM & Registry Integration (Zero PowerShell)
 
-To enable frontend designers and developers to iterate rapidly without performing real disk writes or having a compiled Rust backend running, `@tauri-custom-installer/client` detects if it is running inside a standard browser:
+### 3.1 Shortcuts with `System.AppUserModel.ID` (`IShellLinkW` + `IPropertyStore`)
+Shortcuts are created directly via Win32 COM vtables (`CLSID_ShellLink`, `IShellLinkW`, `IPersistFile`, `IPropertyStore`) in under 5 milliseconds without spawning PowerShell:
+- Stamps `PKEY_AppUserModel_ID` (`{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}, 5`) with `manifest.app_id` on `.lnk` files so Windows Toast Notifications (`tauri-plugin-notification`) and taskbar grouping work identically to NSIS/MSI.
 
-- In `vite dev`, the SDK automatically switches to `MockInstallerDriver`.
-- Simulates realistic drive sizes (180+ GB available).
-- Simulates file decompression over 3–5 seconds with animated file names.
-- Emits shortcut and registry simulation events.
-- Allows complete visual styling, dark/light theme adjustments, and interaction testing using standard browser DevTools and Vite HMR.
+### 3.2 Native Folder Picker (`IFileOpenDialog`)
+Folder selection uses `CLSID_FileOpenDialog` with `FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST`. When the user selects an existing non-empty folder, `normalize_selected_folder` automatically appends `\<AppName>` (matching NSIS and VS Code behavior).
+
+### 3.3 Registry Integration
+Writes under `HKCU` (`perUser`) or `HKLM` (`perMachine`):
+- `Software\Microsoft\Windows\CurrentVersion\Uninstall\<AppId>`: `DisplayName`, `DisplayVersion`, `VersionMajor`, `VersionMinor`, `Publisher`, `DisplayIcon`, `InstallLocation`, `InstallDate` (`YYYYMMDD`), `UninstallString`, `QuietUninstallString`, `ModifyPath`, `EstimatedSize`, `TciInstallScope`, and saved shortcut/autostart preferences.
+- `Software\Microsoft\Windows\CurrentVersion\App Paths\<ExeName>`: Enables launching via `Win+R`.
+- `Software\Classes\.<ext>` & `Software\Classes\<scheme>`: Registers `bundle.fileAssociations` (followed by `SHChangeNotify(SHCNE_ASSOCCHANGED)`) and `deep-link` URL schemes.
+
+---
+
+## 4. Manifest-Based Uninstallation & Self-Cleanup
+
+1. **Authoritative Path Resolution**: Reads `InstallLocation` from the Registry or `.tci\manifest.json` beside `uninstall.exe` (never trusting arbitrary paths from IPC).
+2. **Process Closure**: Uses Win32 ToolHelp32 + `QueryFullProcessImageNameW` to locate running processes inside `InstallLocation`, sends `WM_CLOSE` to top-level windows first, and terminates any remaining processes.
+3. **Manifest-Only File Deletion**: Deletes only the files listed in `.tci\manifest.json` (checking `FILE_ATTRIBUTE_REPARSE_POINT` to never follow symlinks or junctions) and removes empty subdirectories with `fs::remove_dir`.
+4. **Optional User Data Purge**: When `purge_user_data` is enabled, removes `%APPDATA%\<AppId>` and `%LOCALAPPDATA%\<AppId>` (including WebView2 `EBWebView` cache).
+5. **Registry Last**: Removes Registry entries only after file cleanup succeeds, then spawns a stripped worker in `%TEMP%` (registered with `MoveFileExW(..., MOVEFILE_DELAY_UNTIL_REBOOT)`) to remove `uninstall.exe` once the process exits.

@@ -1,25 +1,52 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import pc from 'picocolors';
+import { detectAppConfig, detectPackageManager } from '../utils/config';
 import { runProcess } from '../utils/exec';
 
-export async function runDev(): Promise<void> {
+export interface DevOptions {
+  native?: boolean;
+}
+
+export async function runDev(options: DevOptions = {}): Promise<void> {
   const cwd = process.cwd();
-  const installerDir = path.join(cwd, 'installer');
+  const appConfig = detectAppConfig(cwd);
+  const installerDir = path.resolve(cwd, appConfig.uiRoot || './installer');
 
   if (!fs.existsSync(installerDir)) {
-    console.error(pc.red(`❌ No 'installer/' directory found in ${cwd}`));
+    console.error(pc.red(`❌ No '${appConfig.uiRoot}' directory found in ${cwd}`));
     console.error(pc.yellow(`Run '${pc.bold('tauri-custom-installer init')}' first.`));
     process.exit(1);
   }
 
-  console.log(pc.cyan(`\n🚀 Starting installer UI development server with Hot Module Replacement...`));
-  console.log(pc.gray(`Mock simulation engine is active. Changes in installer/src will update live.\n`));
+  const pm = detectPackageManager(installerDir);
 
-  // Determine package manager (bun / npm)
-  const isBun = fs.existsSync(path.join(installerDir, 'bun.lockb')) || fs.existsSync(path.join(cwd, 'bun.lockb'));
-  const runner = isBun ? 'bun' : 'npm';
-  const args = isBun ? ['run', 'dev'] : ['run', 'dev'];
+  if (options.native) {
+    console.log(
+      pc.cyan(`\n🚀 Starting native installer window in ${pc.bold('DRY-RUN SANDBOX')} mode...`)
+    );
+    console.log(
+      pc.gray(
+        `Registry writes are isolated under HKCU\\Software\\tci-sandbox. Changes in installer/src update live.\n`
+      )
+    );
+    await runProcess('cargo', ['tauri', 'dev'], {
+      cwd: installerDir,
+      env: {
+        TCI_DRY_RUN: '1',
+      },
+    });
+    return;
+  }
 
-  await runProcess(runner, args, { cwd: installerDir });
+  console.log(
+    pc.cyan(`\n🚀 Starting installer UI development server with Hot Module Replacement...`)
+  );
+  console.log(
+    pc.gray(
+      `Mock simulation engine is active (?scenario=success|app_running|already_installed_upgrade|insufficient_space|uninstall).\n`
+    )
+  );
+
+  await runProcess(pm, ['run', 'dev'], { cwd: installerDir });
 }

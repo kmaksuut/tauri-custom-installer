@@ -1,0 +1,21 @@
+{
+  "productName": "Sample Tauri App",
+  "identifier": "com.sample.tauriapp",
+  "version": "1.0.0",
+  "publisher": "Tauri Community",
+  "ui": {
+    "root": "./installer",
+    "outDir": "./installer/dist"
+  },
+  "install": {
+    "mode": "perUser",
+    "shortcuts": {
+      "desktop": true,
+      "startMenu": true
+    },
+    "autostart": "ask",
+    "runAfterInstall": true
+  },
+  "compression": "zstd",
+  "output": "./dist"
+}

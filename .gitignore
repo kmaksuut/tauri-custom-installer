@@ -1,14 +1,25 @@
 # Target and build outputs
 target/
 dist/
+!packages/runtime/dist/
+!examples/sample-tauri-app/dist/
+examples/sample-tauri-app/dist/*.exe
 dist-installer/
 build/
 node_modules/
 .bun/
 
-# Tauri build artifacts
+# Tauri & TCI build artifacts
 src-tauri/target/
+**/src-tauri/gen/
 payload/
+.tci/
+**/.tci/
+**/.payload_staging/
+packages/cli/templates/
+packages/cli/vendor/
+templates/*/bun.lock
+templates/*/bun.lockb
 
 # Logs and system files
 *.log

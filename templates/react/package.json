@@ -1,6 +1,6 @@
 {
   "name": "tauri-custom-installer-template-react",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
-    "@tauri-custom-installer/client": "workspace:*",
+    "@tauri-custom-installer/client": "file:../../packages/client",
     "clsx": "^2.1.1",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",

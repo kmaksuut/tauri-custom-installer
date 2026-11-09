@@ -1,6 +1,6 @@
 import { AlertCircle, CheckCircle, Trash2, X } from 'lucide-react';
 import type { FC } from 'react';
-import { useUninstall } from '@tauri-custom-installer/client';
+import { useUninstall } from '@tauri-custom-installer/client/react';
 
 interface UninstallViewProps {
   appName: string;
