@@ -76,5 +76,6 @@
     "vue",
     "solid"
   ],
+  "author": "kmaksuut",
   "license": "MIT"
 }

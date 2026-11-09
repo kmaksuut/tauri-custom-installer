@@ -4,22 +4,33 @@ dist/
 !packages/runtime/dist/
 !examples/sample-tauri-app/dist/
 examples/sample-tauri-app/dist/*.exe
+examples/sample-tauri-app/dist/*.yaml
+examples/sample-tauri-app/dist/latest.json
 dist-installer/
+release-assets/
 build/
 node_modules/
 .bun/
+*.tgz
 
-# Tauri & TCI build artifacts
+# Internal planning / scratch notes (do not push to GitHub)
+todo.md
+TODO.md
+
+# Tauri & TCI generated build artifacts
 src-tauri/target/
-**/src-tauri/gen/
+**/gen/
 payload/
 .tci/
 **/.tci/
+**/.tci-sdk/
 **/.payload_staging/
 packages/cli/templates/
 packages/cli/vendor/
 templates/*/bun.lock
 templates/*/bun.lockb
+examples/*/installer/bun.lock
+examples/*/installer/bun.lockb
 
 # Logs and system files
 *.log

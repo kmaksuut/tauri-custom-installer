@@ -53,5 +53,6 @@
     "svelte",
     "vue"
   ],
+  "author": "kmaksuut",
   "license": "MIT"
 }

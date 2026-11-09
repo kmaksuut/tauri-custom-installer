@@ -32,6 +32,6 @@
     "windows-installer",
     "desktop"
   ],
-  "author": "Tauri Custom Installer Contributors",
+  "author": "kmaksuut",
   "license": "MIT"
 }

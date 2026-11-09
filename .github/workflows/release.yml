@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -23,12 +28,32 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Build Packages
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Prebuilt Runtime Binary (tci-runtime)
+        run: cargo build --release --package tci-runtime
+
+      - name: Build Client SDK & CLI Package
         run: |
-          cd packages/client && bun install && bun run build
-          cd ../cli && bun install && bun run build
+          bun install
+          npm run build
+          npm --prefix packages/cli pack
+
+      - name: Prepare Release Artifacts & Checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          Copy-Item target/release/tci-runtime.exe release-assets/tci-runtime-x64.exe
+          Copy-Item packages/cli/*.tgz release-assets/
+          Get-ChildItem release-assets/* | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Out-File -Append -Encoding utf8 release-assets/SHA256SUMS.txt
+          }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

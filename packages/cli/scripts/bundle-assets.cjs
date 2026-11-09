@@ -60,8 +60,15 @@ if (fs.existsSync(rootTemplates)) {
   copyDir(rootTemplates, cliTemplates);
 }
 
-// 2. Sync packages/client and packages/core into packages/cli/vendor for standalone external installs
+// 2. Sync packages/client, packages/core, and prebuilt tci-runtime.exe (if present) into packages/cli/vendor
 const vendorDir = path.join(cliRoot, 'vendor');
 fs.rmSync(vendorDir, { recursive: true, force: true });
 copyDirIncludeDist(path.join(repoRoot, 'packages', 'client'), path.join(vendorDir, 'client'));
 copyDir(path.join(repoRoot, 'packages', 'core'), path.join(vendorDir, 'core'));
+
+const runtimeExe = path.join(repoRoot, 'target', 'release', 'tci-runtime.exe');
+if (fs.existsSync(runtimeExe)) {
+  const vendorRuntimeDir = path.join(vendorDir, 'runtime');
+  fs.mkdirSync(vendorRuntimeDir, { recursive: true });
+  fs.copyFileSync(runtimeExe, path.join(vendorRuntimeDir, 'tci-runtime.exe'));
+}
