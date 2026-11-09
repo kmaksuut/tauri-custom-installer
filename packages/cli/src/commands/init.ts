@@ -195,7 +195,7 @@ export async function runInit(options: InitOptions): Promise<void> {
           pkg.dependencies['@tauri-custom-installer/client'] = `file:${clientRelPath}`;
         } else if (cliBundledClientDir) {
           const vendoredClientDir = path.join(targetDir, '.tci-sdk', 'client');
-          copyDirSync(cliBundledClientDir, vendoredClientDir);
+          copyDirSync(cliBundledClientDir, vendoredClientDir, true);
           pkg.dependencies['@tauri-custom-installer/client'] = 'file:./.tci-sdk/client';
         } else {
           pkg.dependencies['@tauri-custom-installer/client'] = '^0.2.0';
@@ -322,7 +322,7 @@ export async function runInit(options: InitOptions): Promise<void> {
   console.log(`  3. ${pc.bold(`${runCmd} installer:build`)} (compile standalone setup .exe)\n`);
 }
 
-function copyDirSync(src: string, dest: string) {
+function copyDirSync(src: string, dest: string, includeDist = false) {
   fs.mkdirSync(dest, { recursive: true });
   const entries = fs.readdirSync(src, { withFileTypes: true });
 
@@ -333,7 +333,7 @@ function copyDirSync(src: string, dest: string) {
     if (
       entry.name === 'node_modules' ||
       entry.name === 'target' ||
-      entry.name === 'dist' ||
+      (!includeDist && entry.name === 'dist') ||
       entry.name === '.git' ||
       entry.name === 'bun.lock' ||
       entry.name === 'bun.lockb' ||
@@ -343,7 +343,7 @@ function copyDirSync(src: string, dest: string) {
     }
 
     if (entry.isDirectory()) {
-      copyDirSync(srcPath, destPath);
+      copyDirSync(srcPath, destPath, includeDist);
     } else {
       fs.copyFileSync(srcPath, destPath);
     }

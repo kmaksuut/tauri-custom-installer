@@ -1,34 +1,94 @@
 {
-  "name": "tauri-custom-installer-monorepo",
+  "name": "tauri-custom-installer",
   "version": "0.2.0",
-  "private": true,
-  "description": "Custom, modern, web-based installers for Tauri v2 applications",
-  "type": "module",
+  "description": "Tauri Custom Installer with Tauri v2 — Build modern, web-based (React, Svelte, Vue, Solid, Vanilla) custom installers for Tauri v2 using Tauri v2 itself",
+  "bin": {
+    "tci": "./packages/cli/dist/index.js",
+    "tauri-custom-installer": "./packages/cli/dist/index.js"
+  },
+  "main": "./packages/cli/dist/index.js",
+  "types": "./packages/cli/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./packages/cli/dist/index.d.ts",
+      "require": "./packages/cli/dist/index.js",
+      "default": "./packages/cli/dist/index.js"
+    },
+    "./client": {
+      "types": "./packages/client/dist/index.d.ts",
+      "import": "./packages/client/dist/index.js",
+      "require": "./packages/client/dist/index.js",
+      "default": "./packages/client/dist/index.js"
+    },
+    "./react": {
+      "types": "./packages/client/dist/react/index.d.ts",
+      "import": "./packages/client/dist/react/index.js",
+      "require": "./packages/client/dist/react/index.js",
+      "default": "./packages/client/dist/react/index.js"
+    },
+    "./svelte": {
+      "types": "./packages/client/dist/svelte/index.d.ts",
+      "import": "./packages/client/dist/svelte/index.js",
+      "require": "./packages/client/dist/svelte/index.js",
+      "default": "./packages/client/dist/svelte/index.js"
+    },
+    "./vue": {
+      "types": "./packages/client/dist/vue/index.d.ts",
+      "import": "./packages/client/dist/vue/index.js",
+      "require": "./packages/client/dist/vue/index.js",
+      "default": "./packages/client/dist/vue/index.js"
+    },
+    "./solid": {
+      "types": "./packages/client/dist/solid/index.d.ts",
+      "import": "./packages/client/dist/solid/index.js",
+      "require": "./packages/client/dist/solid/index.js",
+      "default": "./packages/client/dist/solid/index.js"
+    }
+  },
+  "files": [
+    "packages/cli/dist",
+    "packages/client/dist",
+    "packages/client/package.json",
+    "packages/core/Cargo.toml",
+    "packages/core/src",
+    "templates"
+  ],
   "workspaces": [
     "packages/*",
     "templates/*"
   ],
   "scripts": {
     "build": "npm --prefix packages/client run build && npm --prefix packages/cli run build",
+    "prepare": "npm run build",
     "test": "npm --prefix packages/client run test && cargo test --package tauri-custom-installer-core",
     "test:rust": "cargo test --package tauri-custom-installer-core",
     "test:client": "npm --prefix packages/client run test"
   },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "commander": "^13.1.0",
+    "picocolors": "^1.1.1"
+  },
   "devDependencies": {
     "typescript": "^5.7.3"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tauri-custom-installer/tauri-custom-installer.git"
+    "url": "https://github.com/kmaksuut/tauri-custom-installer.git"
   },
   "keywords": [
     "tauri",
     "tauri-v2",
     "installer",
     "custom-installer",
+    "tauri-installer",
     "react",
     "svelte",
     "vue",
+    "solid",
     "windows-installer",
     "desktop"
   ],

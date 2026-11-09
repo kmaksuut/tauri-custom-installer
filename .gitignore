@@ -1,6 +1,8 @@
 # Target and build outputs
 target/
 dist/
+!packages/cli/dist/
+!packages/client/dist/
 !packages/runtime/dist/
 !examples/sample-tauri-app/dist/
 examples/sample-tauri-app/dist/*.exe

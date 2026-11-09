@@ -1,14 +1,17 @@
-# Tauri Custom Installer (`tauri-custom-installer`)
+# Tauri Custom Installer with Tauri v2 (`tauri-custom-installer`)
 
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](./LICENSE)
-[![Tauri v2](https://img.shields.io/badge/Tauri-v2-blue.svg)](https://v2.tauri.app/)
+[![Tauri v2](https://img.shields.io/badge/Built%20with%20Tauri%20v2-for%20Tauri%20v2-blue.svg)](https://v2.tauri.app/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178C6.svg)](https://www.typescriptlang.org/)
 [![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584.svg)](https://www.rust-lang.org/)
 
-**Build sleek, modern, web-based (React, Svelte, Vue, Solid, Vanilla HTML/CSS/TS) custom installers for Tauri v2 desktop applications.**  
-Replace legacy 1990s Win32 NSIS wizards with a branded, frameless, animated setup experience written in your favorite frontend stack—with full NSIS/MSI feature parity, `tar.zst` streaming compression, and manifest-based security.
+> [!NOTE]
+> **100% AI-Developed:** This entire project, codebase, and architecture was authored and engineered completely by Artificial Intelligence, powered by **Gemini 3.8 Flash** and **Gemini 4 Argon**.
+
+**Build a custom Tauri v2 installer *with Tauri v2 itself* using React, Svelte, Vue, Solid, or Vanilla HTML/CSS/TS.**  
+Instead of writing legacy 1990s Win32 NSIS scripts or WiX XML, your setup wizard is **itself a lightweight, frameless Tauri v2 application** that extracts, registers, updates, and uninstalls your main Tauri v2 desktop app—with full NSIS/MSI feature parity, `tar.zst` streaming compression, and manifest-based security.
 
 [Why Custom Installer?](#-why-tauri-custom-installer) • [Step-by-Step Integration Guide](#-step-by-step-integration-guide) • [Configuration (`tci.config.json`)](#-configuration-reference-tciconfigjson) • [Framework Examples](#-framework-code-examples) • [CLI & Enterprise Flags](#-cli--enterprise-flags-reference) • [Security Model](./SECURITY.md)
 
@@ -16,21 +19,24 @@ Replace legacy 1990s Win32 NSIS wizards with a branded, frameless, animated setu
 
 ---
 
-## 💡 Why `tauri-custom-installer`?
+## 💡 Why `tauri-custom-installer`? (Tauri Installer Built with Tauri)
 
 When you run `tauri build` on Windows, Tauri generates traditional **NSIS** (`-setup.exe`) or **WiX** (`.msi`) installers:
 - **Legacy UI Limitations**: NSIS relies on 1990s-era Win32 dialog boxes. Adding custom animations, glassmorphism, onboarding carousels, or interactive cards is nearly impossible.
 - **Arcane Scripting**: Customizing NSIS requires learning `.nsi` macro scripting instead of HTML, CSS, and TypeScript.
 - **Modern Expectations**: Applications like **Discord, Spotify, Steam, Battle.net, and VS Code** greet users with modern, branded, transparent setup wizards.
 
-**`tauri-custom-installer`** adds a **first-class custom installer build target** alongside (or in place of) NSIS and MSI:
+**`tauri-custom-installer` solves this by letting you build your Tauri v2 installer *using Tauri v2 itself*:**
+- Your installer UI is just a standard frontend project (**React, Svelte 5, Vue 3, Solid, Ember, or Vanilla HTML/CSS/TS**).
+- Under the hood, a purpose-built **Tauri v2 Setup Runtime (`tci-runtime` + `tauri-custom-installer-core`)** renders your frameless web UI and executes all native Windows OS operations in Rust (`tar.zst` extraction, Win32 COM shortcuts with `AppUserModelID`, Registry registration, process management, and manifest-based uninstallation).
 
-| Feature | Traditional NSIS / WiX | `tauri-custom-installer` |
+| Feature | Traditional NSIS / WiX | `tauri-custom-installer` (Tauri-in-Tauri) |
 | :--- | :--- | :--- |
+| **Installer Engine** | Win32 NSIS stub / MSI `msiexec` | **Tauri v2 Runtime (`tci-runtime`) + Rust Core (`tauri-custom-installer-core`)** |
 | **UI Technology** | Win32 grey dialogs & bitmap banners | **React, Svelte 5, Vue 3, Solid, Ember, Vanilla HTML/CSS/TS** |
 | **Developer Experience** | `.nsi` / XML scripting | **Vite HMR + Scenario Simulator + `--native` Dry-Run Sandbox** |
 | **Compression & Streaming** | LZMA / Deflate | **`tar.zst` (Zstandard) & `.zip` with O(1) constant-memory `SectionReader` streaming** |
-| **Uninstaller Footprint** | Separate stub | **Stripped `uninstall.exe` (~2.5 MB, keeps custom UI without duplicating app payload)** |
+| **Uninstaller Footprint** | Separate stub | **Stripped `uninstall.exe` (keeps custom Tauri UI without duplicating app payload)** |
 | **Safe Uninstallation** | Basic folder delete | **Manifest-tracked (`.tci/manifest.json`) — only deletes installed files, preserves user files, supports `purge_user_data`** |
 | **Windows Integration** | Registry + Shortcuts | **Add/Remove Programs, `App Paths`, File Associations, Deep-Link URL Schemes, `System.AppUserModel.ID` (Toast Notifications)** |
 | **Zero PowerShell Overhead** | N/A | **100% Native Win32 COM (`IShellLinkW`, `IPropertyStore`, `IFileOpenDialog`)** |
@@ -80,24 +86,33 @@ flowchart TD
 
 Open a terminal in the **root directory of your Tauri v2 project** (where your main `package.json` and `src-tauri/` folder live).
 
-#### Option A: Install via Bun / npm / pnpm / Yarn
+#### Option A: Install Directly from GitHub Repository (Recommended)
+```bash
+# Bun
+bun add -d github:kmaksuut/tauri-custom-installer
+
+# npm
+npm install -D github:kmaksuut/tauri-custom-installer
+
+# pnpm
+pnpm add -D github:kmaksuut/tauri-custom-installer
+
+# Yarn
+yarn add -D github:kmaksuut/tauri-custom-installer
+```
+
+#### Option B: Install from npm Registry
 ```bash
 # Bun
 bun add -d tauri-custom-installer
 
 # npm
 npm install -D tauri-custom-installer
-
-# pnpm
-pnpm add -D tauri-custom-installer
-
-# Yarn
-yarn add -D tauri-custom-installer
 ```
 
-#### Option B: Use Directly from GitHub Repository
+#### Option C: Clone & Run Locally
 ```bash
-git clone https://github.com/tauri-custom-installer/tauri-custom-installer.git
+git clone https://github.com/kmaksuut/tauri-custom-installer.git
 cd tauri-custom-installer
 npm install && npm run build
 

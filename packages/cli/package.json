@@ -1,7 +1,7 @@
 {
-  "name": "tauri-custom-installer",
+  "name": "@tauri-custom-installer/cli",
   "version": "0.2.0",
-  "description": "CLI toolkit and SDK to generate, develop, and build modern custom installers for Tauri v2",
+  "description": "CLI toolkit for Tauri Custom Installer — build custom Tauri v2 installers with Tauri v2 itself",
   "bin": {
     "tci": "./dist/index.js",
     "tauri-custom-installer": "./dist/index.js"
