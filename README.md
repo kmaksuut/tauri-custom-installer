@@ -7,8 +7,12 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178C6.svg)](https://www.typescriptlang.org/)
 [![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584.svg)](https://www.rust-lang.org/)
 
+</div>
+
 > [!NOTE]
 > **100% AI-Developed:** This entire project, codebase, and architecture was authored and engineered completely by Artificial Intelligence, powered by **Gemini 3.8 Flash** and **Gemini 4 Argon**.
+
+<div align="center">
 
 **Build sleek, modern, web-based custom installers for Tauri v2 using Tauri v2 itself.**  
 Replace outdated 1990s Win32 NSIS wizards with a frameless, animated setup experience written in **React, Svelte 5, Vue 3, Solid, or Vanilla HTML/CSS/TS**—with full NSIS/MSI feature parity, `tar.zst` streaming, and manifest-based safe uninstallation.
