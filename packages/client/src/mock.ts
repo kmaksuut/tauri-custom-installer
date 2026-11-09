@@ -35,7 +35,13 @@ export function isTauriEnvironment(): boolean {
 }
 
 export class MockInstallerDriver {
+  private static cancelRequested = false;
+
   static getSystemInfo(appName: string, _appId: string, _requiredBytes: number): SystemInfo {
+    const isUninstallUrl =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('mode') === 'uninstall';
+
     return {
       default_install_path: `C:\\Users\\Developer\\AppData\\Local\\Programs\\${appName}`,
       program_files_path: `C:\\Program Files\\${appName}`,
@@ -46,18 +52,40 @@ export class MockInstallerDriver {
       is_already_installed: false,
       existing_version: null,
       existing_install_path: null,
+      is_uninstall_mode: isUninstallUrl,
     };
   }
 
-  static validateInstallPath(_path: string, requiredBytes: number): PathValidation {
+  static validateInstallPath(path: string, requiredBytes: number): PathValidation {
+    if (!path || path.trim().length === 0) {
+      return {
+        is_valid: false,
+        is_writable: false,
+        has_enough_space: false,
+        available_bytes: 0,
+        error_message: 'Path cannot be empty.',
+      };
+    }
+
     const available = 184 * 1024 * 1024 * 1024;
     return {
-      is_valid: true,
+      is_valid: available >= requiredBytes,
       is_writable: true,
       has_enough_space: available >= requiredBytes,
       available_bytes: available,
-      error_message: null,
+      error_message: available >= requiredBytes ? null : 'Insufficient disk space.',
     };
+  }
+
+  static async selectFolder(initialPath?: string): Promise<string | null> {
+    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+      const selected = window.prompt(
+        '[Simulation Mode] Enter or confirm destination folder path:',
+        initialPath || 'C:\\Users\\Developer\\AppData\\Local\\Programs\\MyApp'
+      );
+      return selected && selected.trim().length > 0 ? selected.trim() : null;
+    }
+    return initialPath || null;
   }
 
   static checkRunning(_executableName: string): RunningProcessInfo {
@@ -67,14 +95,23 @@ export class MockInstallerDriver {
     };
   }
 
+  static cancelInstallation(): void {
+    this.cancelRequested = true;
+  }
+
   static async simulateInstallation(
     _options: InstallOptions,
     onProgress: (prog: InstallProgress) => void
   ): Promise<void> {
+    this.cancelRequested = false;
     const totalFiles = DUMMY_FILES.length;
     const totalBytes = 128 * 1024 * 1024; // 128 MB
 
     for (let i = 0; i < totalFiles; i++) {
+      if (this.cancelRequested) {
+        throw new Error('Installation cancelled by user.');
+      }
+
       const file = DUMMY_FILES[i];
       const progressPercent = ((i + 1) / totalFiles) * 95;
       const bytesExtracted = Math.floor((progressPercent / 100) * totalBytes);
@@ -93,10 +130,14 @@ export class MockInstallerDriver {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
+    if (this.cancelRequested) {
+      throw new Error('Installation cancelled by user.');
+    }
+
     // Creating shortcuts & registry
     onProgress({
       stage: 'creating_shortcuts',
-      current_file: 'shortcuts',
+      current_file: 'Creating system shortcuts...',
       files_completed: totalFiles,
       total_files: totalFiles,
       bytes_extracted: totalBytes,

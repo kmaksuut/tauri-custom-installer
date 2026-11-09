@@ -8,6 +8,7 @@ export interface SystemInfo {
   is_already_installed: boolean;
   existing_version?: string | null;
   existing_install_path?: string | null;
+  is_uninstall_mode?: boolean;
 }
 
 export interface PathValidation {

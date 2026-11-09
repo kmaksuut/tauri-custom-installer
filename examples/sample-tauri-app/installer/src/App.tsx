@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useInstaller } from '@tauri-custom-installer/client';
 import { CompletedStep } from './components/CompletedStep';
 import { InstallingStep } from './components/InstallingStep';
@@ -7,27 +6,23 @@ import { RunningWarningStep } from './components/RunningWarningStep';
 import { TitleBar } from './components/TitleBar';
 import { UninstallView } from './components/UninstallView';
 import { WelcomeStep } from './components/WelcomeStep';
+import installerConfig from './installer.config.json';
 
-// Configuration can be customized or read from environment
-const APP_NAME = 'My Awesome App';
-const APP_ID = 'com.example.myawesomeapp';
-const APP_VERSION = '1.0.0';
-const PUBLISHER = 'Antigravity Studio';
-const EXECUTABLE_NAME = 'my-awesome-app.exe';
-const REQUIRED_BYTES = 75 * 1024 * 1024; // 75 MB
+const APP_NAME = installerConfig.appName;
+const APP_ID = installerConfig.appId;
+const APP_VERSION = installerConfig.appVersion;
+const PUBLISHER = installerConfig.publisher;
+const EXECUTABLE_NAME = installerConfig.executableName;
+const REQUIRED_BYTES = installerConfig.requiredBytes;
 
 export function App() {
-  const isUninstallMode = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('mode') === 'uninstall';
-  }, []);
-
   const {
     step,
     setStep,
+    isUninstallMode,
     installPath,
     setInstallPath,
+    browseInstallPath,
     createDesktopShortcut,
     setCreateDesktopShortcut,
     createStartMenuShortcut,
@@ -40,8 +35,10 @@ export function App() {
     progress,
     errorMessage,
     startInstall,
+    cancelInstall,
     terminateRunningAndInstall,
     launchApp,
+    minimize,
     exit,
   } = useInstaller({
     appName: APP_NAME,
@@ -61,6 +58,7 @@ export function App() {
       {/* Borderless Title Bar */}
       <TitleBar
         title={isUninstallMode ? `${APP_NAME} Uninstaller` : `${APP_NAME} Setup`}
+        onMinimize={minimize}
         onClose={exit}
       />
 
@@ -89,6 +87,7 @@ export function App() {
               <OptionsStep
                 installPath={installPath}
                 setInstallPath={setInstallPath}
+                onBrowse={browseInstallPath}
                 createDesktopShortcut={createDesktopShortcut}
                 setCreateDesktopShortcut={setCreateDesktopShortcut}
                 createStartMenuShortcut={createStartMenuShortcut}
@@ -111,7 +110,11 @@ export function App() {
             )}
 
             {step === 'installing' && (
-              <InstallingStep appName={APP_NAME} progress={progress} />
+              <InstallingStep
+                appName={APP_NAME}
+                progress={progress}
+                onCancel={cancelInstall}
+              />
             )}
 
             {step === 'completed' && (
@@ -128,13 +131,13 @@ export function App() {
                 <div className="w-14 h-14 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-4">
                   <span className="text-xl font-bold">!</span>
                 </div>
-                <h2 className="text-lg font-bold text-white">Installation Error</h2>
+                <h2 className="text-lg font-bold text-white">Installation Stopped</h2>
                 <p className="text-xs text-rose-300 max-w-md mt-2">{errorMessage}</p>
                 <button
                   onClick={() => setStep('welcome')}
                   className="mt-6 px-5 py-2 rounded-xl bg-slate-800 text-slate-200 hover:text-white text-xs font-semibold"
                 >
-                  Try Again
+                  Return to Setup
                 </button>
               </div>
             )}

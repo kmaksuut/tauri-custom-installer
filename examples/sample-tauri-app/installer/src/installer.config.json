@@ -1,0 +1,8 @@
+{
+  "appName": "Sample Tauri App",
+  "appId": "com.sample.tauriapp",
+  "appVersion": "1.0.0",
+  "publisher": "Tauri Community",
+  "executableName": "sample-tauri-app.exe",
+  "requiredBytes": 15728640
+}

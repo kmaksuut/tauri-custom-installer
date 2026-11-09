@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { InstallerApi, type InstallProgress } from '@tauri-custom-installer/client';
+import installerConfig from './installer.config.json';
 
-const appName = 'Vue Application';
-const appId = 'com.example.vueapp';
-const appVersion = '1.0.0';
-const publisher = 'Vue Developer';
-const executableName = 'vue-app.exe';
+const appName = installerConfig.appName;
+const appId = installerConfig.appId;
+const appVersion = installerConfig.appVersion;
+const publisher = installerConfig.publisher;
+const executableName = installerConfig.executableName;
 
-const step = ref<'welcome' | 'installing' | 'completed'>('welcome');
+const step = ref<'welcome' | 'installing' | 'completed' | 'uninstall'>('welcome');
 const installPath = ref('');
 const createDesktop = ref(true);
 const createStartMenu = ref(true);
@@ -23,9 +24,19 @@ const progress = ref<InstallProgress>({
 });
 
 onMounted(async () => {
-  const info = await InstallerApi.getSystemInfo(appName, appId);
+  const info = await InstallerApi.getSystemInfo(appName, appId, installerConfig.requiredBytes);
   installPath.value = info.default_install_path;
+  if (info.is_uninstall_mode) {
+    step.value = 'uninstall';
+  }
 });
+
+async function handleBrowse() {
+  const selected = await InstallerApi.selectFolder(installPath.value);
+  if (selected) {
+    installPath.value = selected;
+  }
+}
 
 async function handleInstall() {
   step.value = 'installing';
@@ -49,6 +60,20 @@ async function handleInstall() {
   step.value = 'completed';
 }
 
+async function handleUninstall() {
+  await InstallerApi.startUninstallation(
+    {
+      app_id: appId,
+      install_dir: installPath.value,
+      purge_user_data: false,
+    },
+    appName,
+    executableName,
+    () => {}
+  );
+  await InstallerApi.exitInstaller();
+}
+
 async function handleFinish() {
   await InstallerApi.launchInstalledApp(`${installPath.value}\\${executableName}`);
   await InstallerApi.exitInstaller();
@@ -67,8 +92,13 @@ async function handleFinish() {
 
     <div class="content">
       <div v-if="step === 'welcome'">
-        <h1>{{ appName }}</h1>
-        <p class="subtitle">Built with modern Vue 3 and Tauri v2.</p>
+        <h1>{{ appName }} <span class="badge">v{{ appVersion }}</span></h1>
+        <p class="subtitle">Published by {{ publisher }}</p>
+
+        <div class="path-row">
+          <input class="path-input" type="text" v-model="installPath" />
+          <button class="secondary-btn" @click="handleBrowse">Browse...</button>
+        </div>
 
         <div class="options">
           <label class="check-label">
@@ -97,7 +127,13 @@ async function handleFinish() {
       <div v-else-if="step === 'completed'" class="center-content">
         <h2>Installation Successful!</h2>
         <p class="subtitle">{{ appName }} is ready to run on your PC.</p>
-        <button class="primary-btn" @click="handleFinish">Finish</button>
+        <button class="primary-btn" @click="handleFinish">Finish & Launch</button>
+      </div>
+
+      <div v-else-if="step === 'uninstall'" class="center-content">
+        <h2>Uninstall {{ appName }}?</h2>
+        <p class="subtitle">This will remove {{ appName }} from {{ installPath }}.</p>
+        <button class="primary-btn" @click="handleUninstall">Confirm Uninstall</button>
       </div>
     </div>
   </div>
@@ -136,6 +172,13 @@ async function handleFinish() {
   border-radius: 50%;
   background: #42b883;
 }
+.badge {
+  font-size: 12px;
+  background: rgba(66, 184, 131, 0.15);
+  color: #42b883;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
 .close-btn {
   background: transparent;
   border: none;
@@ -167,13 +210,36 @@ h2 {
 .subtitle {
   font-size: 13px;
   color: #94a3b8;
-  margin: 6px 0 20px 0;
+  margin: 6px 0 16px 0;
+}
+.path-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.path-input {
+  flex: 1;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 12px;
+}
+.secondary-btn {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
 }
 .options {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 20px;
 }
 .check-label {
   display: flex;

@@ -1,0 +1,8 @@
+{
+  "appName": "Svelte Application",
+  "appId": "com.example.svelteapp",
+  "appVersion": "1.0.0",
+  "publisher": "Svelte Developer",
+  "executableName": "svelte-app.exe",
+  "requiredBytes": 52428800
+}

@@ -1,10 +1,11 @@
-import { ArrowLeft, ArrowRight, Folder, HardDrive, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Folder, FolderOpen, HardDrive, Info } from 'lucide-react';
 import type { FC } from 'react';
 import type { PathValidation } from '@tauri-custom-installer/client';
 
 interface OptionsStepProps {
   installPath: string;
   setInstallPath: (path: string) => void;
+  onBrowse: () => void;
   createDesktopShortcut: boolean;
   setCreateDesktopShortcut: (val: boolean) => void;
   createStartMenuShortcut: boolean;
@@ -20,6 +21,7 @@ interface OptionsStepProps {
 export const OptionsStep: FC<OptionsStepProps> = ({
   installPath,
   setInstallPath,
+  onBrowse,
   createDesktopShortcut,
   setCreateDesktopShortcut,
   createStartMenuShortcut,
@@ -34,7 +36,7 @@ export const OptionsStep: FC<OptionsStepProps> = ({
   const availableMb = validation?.available_bytes
     ? Math.floor(validation.available_bytes / (1024 * 1024))
     : 0;
-  const requiredMb = Math.ceil(requiredBytes / (1024 * 1024));
+  const requiredMb = Math.max(1, Math.ceil(requiredBytes / (1024 * 1024)));
 
   return (
     <div className="flex-1 flex flex-col justify-between p-6">
@@ -59,6 +61,14 @@ export const OptionsStep: FC<OptionsStepProps> = ({
                 className="w-full bg-transparent outline-none font-mono text-[11px]"
               />
             </div>
+            <button
+              type="button"
+              onClick={onBrowse}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 hover:text-white transition-colors flex items-center gap-1.5 shrink-0"
+            >
+              <FolderOpen size={14} className="text-emerald-400" />
+              <span>Browse...</span>
+            </button>
           </div>
 
           {/* Disk space check indicator */}

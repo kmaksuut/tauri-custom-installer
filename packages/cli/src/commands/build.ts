@@ -41,10 +41,16 @@ export async function runBuild(options: BuildOptions): Promise<void> {
 
   // Step 2: Locate compiled binary files
   console.log(pc.blue(`\n[2/4] Packaging application payload...`));
-  const candidateTargetDirs = [
+  const candidateTargetDirs: string[] = [
     path.join(cwd, 'src-tauri', 'target', 'release'),
-    path.join(cwd, 'target', 'release'),
   ];
+  let checkRoot: string | null = cwd;
+  while (checkRoot) {
+    candidateTargetDirs.push(path.join(checkRoot, 'target', 'release'));
+    const parent = path.dirname(checkRoot);
+    if (parent === checkRoot) break;
+    checkRoot = parent;
+  }
 
   let releaseDir: string | null = null;
   for (const dir of candidateTargetDirs) {
@@ -61,24 +67,59 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   }
   fs.mkdirSync(stageDir, { recursive: true });
 
+  let totalUncompressedBytes = 0;
+  let stagedExeCount = 0;
+
   if (releaseDir && fs.existsSync(releaseDir)) {
     const entries = fs.readdirSync(releaseDir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
-        // Include .exe, .dll, resources, config files
+        // Exclude installer binaries and debug symbols from the main app payload
+        if (
+          entry.name.includes('-installer.exe') ||
+          entry.name.includes('uninstall-worker') ||
+          entry.name.startsWith('build-script') ||
+          entry.name.endsWith('.pdb') ||
+          entry.name.endsWith('.d')
+        ) {
+          continue;
+        }
+
         if (ext === '.exe' || ext === '.dll' || ext === '.json' || ext === '.bin') {
-          // Exclude build artifacts like .pdb or .d
-          if (!entry.name.endsWith('.pdb') && !entry.name.endsWith('.d')) {
-            fs.copyFileSync(path.join(releaseDir, entry.name), path.join(stageDir, entry.name));
+          const srcFile = path.join(releaseDir, entry.name);
+          const destFile = path.join(stageDir, entry.name);
+          fs.copyFileSync(srcFile, destFile);
+          totalUncompressedBytes += fs.statSync(srcFile).size;
+          if (ext === '.exe') {
+            stagedExeCount++;
+            appConfig.executableName = entry.name;
           }
         }
       }
     }
-  } else {
-    // If running in development without a built target, provide a stub executable
+  }
+
+  if (stagedExeCount === 0) {
+    // If running in demo/skip-app-build mode without a compiled main app binary, create a valid stub
     const stubExe = path.join(stageDir, appConfig.executableName);
-    fs.writeFileSync(stubExe, 'MZ_STUB_EXECUTABLE_FOR_DEMO');
+    const stubContent = Buffer.alloc(64 * 1024, 'MZ_TAURI_APPLICATION_PAYLOAD_DEMO');
+    fs.writeFileSync(stubExe, stubContent);
+    totalUncompressedBytes += stubContent.length;
+  }
+
+  // Sync updated metadata and requiredBytes to installer/src/installer.config.json
+  const installerConfigPath = path.join(installerDir, 'src', 'installer.config.json');
+  if (fs.existsSync(path.dirname(installerConfigPath))) {
+    const configData = {
+      appName: appConfig.appName,
+      appId: appConfig.identifier,
+      appVersion: appConfig.version,
+      publisher: appConfig.publisher,
+      executableName: appConfig.executableName,
+      requiredBytes: Math.max(totalUncompressedBytes, 15 * 1024 * 1024),
+    };
+    fs.writeFileSync(installerConfigPath, JSON.stringify(configData, null, 2));
   }
 
   // Compress into installer payload
@@ -87,11 +128,19 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   const payloadZip = path.join(payloadDir, 'app_payload.zip');
 
   const archiveBytes = await createPayloadArchive(stageDir, payloadZip);
-  console.log(pc.green(`✔ Payload archived: ${(archiveBytes / (1024 * 1024)).toFixed(2)} MB`));
+  console.log(
+    pc.green(
+      `✔ Payload archived into src-tauri/payload/app_payload.zip (${(archiveBytes / 1024).toFixed(1)} KB compressed)`
+    )
+  );
 
   // Step 3: Build installer frontend
   console.log(pc.blue(`\n[3/4] Building installer frontend UI...`));
-  const isBun = fs.existsSync(path.join(installerDir, 'bun.lockb')) || fs.existsSync(path.join(cwd, 'bun.lockb'));
+  const isBun =
+    fs.existsSync(path.join(installerDir, 'bun.lock')) ||
+    fs.existsSync(path.join(installerDir, 'bun.lockb')) ||
+    fs.existsSync(path.join(cwd, 'bun.lock')) ||
+    fs.existsSync(path.join(cwd, 'bun.lockb'));
   const runner = isBun ? 'bun' : 'npm';
   await runProcess(runner, ['run', 'build'], { cwd: installerDir });
 
@@ -134,7 +183,8 @@ export async function runBuild(options: BuildOptions): Promise<void> {
           file.endsWith('.exe') &&
           !file.includes('uninstall-worker') &&
           !file.startsWith('build-script') &&
-          (file.includes('installer') || file.toLowerCase().includes(appConfig.appName.toLowerCase().replace(/[^a-z0-9]/g, '')))
+          (file.includes('installer') ||
+            file.toLowerCase().includes(appConfig.appName.toLowerCase().replace(/[^a-z0-9]/g, '')))
         ) {
           const srcPath = path.join(binDir, file);
           fs.copyFileSync(srcPath, finalSetupPath);

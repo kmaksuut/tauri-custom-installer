@@ -39,6 +39,15 @@ export class InstallerApi {
     });
   }
 
+  static async selectFolder(initialPath?: string): Promise<string | null> {
+    if (!isTauriEnvironment()) {
+      return MockInstallerDriver.selectFolder(initialPath);
+    }
+    return invoke<string | null>('select_folder', {
+      initialPath: initialPath ?? null,
+    });
+  }
+
   static async checkRunning(executableName: string): Promise<RunningProcessInfo> {
     if (!isTauriEnvironment()) {
       return MockInstallerDriver.checkRunning(executableName);
@@ -74,6 +83,14 @@ export class InstallerApi {
     });
   }
 
+  static async cancelInstallation(): Promise<void> {
+    if (!isTauriEnvironment()) {
+      MockInstallerDriver.cancelInstallation();
+      return;
+    }
+    return invoke<void>('cancel_installation');
+  }
+
   static async launchInstalledApp(executablePath: string): Promise<void> {
     if (!isTauriEnvironment()) {
       console.log(`[Mock] Launching installed app at: ${executablePath}`);
@@ -103,6 +120,14 @@ export class InstallerApi {
       executableName,
       onProgress: channel,
     });
+  }
+
+  static async minimizeInstaller(): Promise<void> {
+    if (!isTauriEnvironment()) {
+      console.log('[Mock] Minimizing installer window');
+      return;
+    }
+    return invoke<void>('minimize_installer');
   }
 
   static async exitInstaller(): Promise<void> {

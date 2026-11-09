@@ -14,25 +14,33 @@
           <span id="window-title">Application Setup</span>
         </div>
         <div class="titlebar-controls">
+          <button id="btn-minimize" class="btn-ctrl">─</button>
           <button id="btn-close" class="btn-ctrl">✕</button>
         </div>
       </div>
 
       <div class="content" id="step-welcome">
-        <div class="header-section">
-          <h1 id="app-name">My Application</h1>
-          <p id="app-desc" class="desc">Welcome to the setup wizard. Click below to install.</p>
-        </div>
+        <div>
+          <div class="header-section">
+            <h1 id="app-name">My Application</h1>
+            <p id="app-desc" class="desc">Welcome to the setup wizard. Configure your installation options below.</p>
+          </div>
 
-        <div class="options-box">
-          <label class="opt-label">
-            <input type="checkbox" id="chk-desktop" checked />
-            Create Desktop shortcut
-          </label>
-          <label class="opt-label">
-            <input type="checkbox" id="chk-startmenu" checked />
-            Create Start Menu shortcut
-          </label>
+          <div class="path-row">
+            <input type="text" id="input-path" class="path-input" />
+            <button id="btn-browse" class="btn-secondary">Browse...</button>
+          </div>
+
+          <div class="options-box">
+            <label class="opt-label">
+              <input type="checkbox" id="chk-desktop" checked />
+              Create Desktop shortcut
+            </label>
+            <label class="opt-label">
+              <input type="checkbox" id="chk-startmenu" checked />
+              Create Start Menu shortcut
+            </label>
+          </div>
         </div>
 
         <div class="footer">
@@ -41,18 +49,32 @@
       </div>
 
       <div class="content hidden" id="step-installing">
-        <h2>Installing Application...</h2>
-        <div class="progress-bar-container">
-          <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+        <div>
+          <h2>Installing Application...</h2>
+          <div class="progress-bar-container">
+            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
+          <p id="progress-file" class="desc-file">Extracting files...</p>
         </div>
-        <p id="progress-file" class="desc-file">Extracting files...</p>
       </div>
 
       <div class="content hidden" id="step-completed">
-        <h2>Installation Complete!</h2>
-        <p class="desc">The application has been successfully installed on your computer.</p>
+        <div>
+          <h2>Installation Complete!</h2>
+          <p class="desc">The application has been successfully installed on your computer.</p>
+        </div>
         <div class="footer">
-          <button id="btn-finish" class="btn-primary">Finish</button>
+          <button id="btn-finish" class="btn-primary">Finish & Launch</button>
+        </div>
+      </div>
+
+      <div class="content hidden" id="step-uninstall">
+        <div>
+          <h2>Uninstall Application?</h2>
+          <p class="desc">This will remove all installed files, shortcuts, and registry entries.</p>
+        </div>
+        <div class="footer">
+          <button id="btn-uninstall" class="btn-danger">Uninstall Application</button>
         </div>
       </div>
     </div>

@@ -14,6 +14,7 @@ export function detectAppConfig(cwd: string = process.cwd()): AppConfig {
   let version = '1.0.0';
   let identifier = 'com.tauri.custominstaller';
   let publisher = 'Tauri Developer';
+  let cargoBinName: string | null = null;
 
   // 1. Check tauri.conf.json
   const tauriConfPaths = [
@@ -29,6 +30,7 @@ export function detectAppConfig(cwd: string = process.cwd()): AppConfig {
         if (content.version) version = content.version;
         if (content.identifier) identifier = content.identifier;
         if (content.bundle?.publisher) publisher = content.bundle.publisher;
+        if (content.mainBinaryName) cargoBinName = content.mainBinaryName;
         break;
       } catch {
         // ignore parse errors
@@ -36,7 +38,21 @@ export function detectAppConfig(cwd: string = process.cwd()): AppConfig {
     }
   }
 
-  // 2. Check package.json if values still default
+  // 2. Check src-tauri/Cargo.toml for binary package name
+  const cargoTomlPath = path.join(cwd, 'src-tauri', 'Cargo.toml');
+  if (!cargoBinName && fs.existsSync(cargoTomlPath)) {
+    try {
+      const cargoContent = fs.readFileSync(cargoTomlPath, 'utf8');
+      const nameMatch = cargoContent.match(/^\s*name\s*=\s*"([^"]+)"/m);
+      if (nameMatch && nameMatch[1]) {
+        cargoBinName = nameMatch[1];
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 3. Check package.json if values still default
   const pkgPath = path.join(cwd, 'package.json');
   if (fs.existsSync(pkgPath)) {
     try {
@@ -55,7 +71,10 @@ export function detectAppConfig(cwd: string = process.cwd()): AppConfig {
     }
   }
 
-  const cleanExeName = `${appName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}.exe`;
+  const baseExe = cargoBinName
+    ? cargoBinName
+    : appName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  const cleanExeName = baseExe.endsWith('.exe') ? baseExe : `${baseExe}.exe`;
 
   return {
     appName,

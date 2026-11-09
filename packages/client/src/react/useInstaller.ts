@@ -45,6 +45,10 @@ export function useInstaller(config: InstallerConfig) {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isUninstallMode, setIsUninstallMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('mode') === 'uninstall';
+  });
 
   // Initialize system specs & default path
   useEffect(() => {
@@ -56,6 +60,9 @@ export function useInstaller(config: InstallerConfig) {
         if (isMounted) {
           setSystemInfo(info);
           setInstallPath(info.default_install_path);
+          if (info.is_uninstall_mode) {
+            setIsUninstallMode(true);
+          }
 
           const val = await InstallerApi.validateInstallPath(
             info.default_install_path,
@@ -90,21 +97,17 @@ export function useInstaller(config: InstallerConfig) {
     [requiredBytes]
   );
 
-  // Check if running prior to installing
-  const proceedToInstall = useCallback(async () => {
+  // Open native folder picker dialog
+  const browseInstallPath = useCallback(async () => {
     try {
-      const running = await InstallerApi.checkRunning(executableName);
-      if (running.is_running) {
-        setRunningProcesses(running);
-        setStep('running_warning');
-        return;
+      const selected = await InstallerApi.selectFolder(installPath);
+      if (selected) {
+        await updateInstallPath(selected);
       }
-      await performInstallation();
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
-      setStep('error');
     }
-  }, [executableName, installPath]);
+  }, [installPath, updateInstallPath]);
 
   // Actual installation routine
   const performInstallation = useCallback(async () => {
@@ -148,6 +151,27 @@ export function useInstaller(config: InstallerConfig) {
     launchAfterInstall,
   ]);
 
+  // Check if running prior to installing
+  const proceedToInstall = useCallback(async () => {
+    try {
+      const running = await InstallerApi.checkRunning(executableName);
+      if (running.is_running) {
+        setRunningProcesses(running);
+        setStep('running_warning');
+        return;
+      }
+      await performInstallation();
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : String(err));
+      setStep('error');
+    }
+  }, [executableName, performInstallation]);
+
+  // Cancel active installation
+  const cancelInstall = useCallback(async () => {
+    await InstallerApi.cancelInstallation();
+  }, []);
+
   // Terminate running processes with user consent and continue
   const terminateRunningAndInstall = useCallback(async () => {
     try {
@@ -168,6 +192,10 @@ export function useInstaller(config: InstallerConfig) {
     await InstallerApi.exitInstaller();
   }, [installPath, executableName]);
 
+  const minimize = useCallback(async () => {
+    await InstallerApi.minimizeInstaller();
+  }, []);
+
   const exit = useCallback(async () => {
     await InstallerApi.exitInstaller();
   }, []);
@@ -176,9 +204,11 @@ export function useInstaller(config: InstallerConfig) {
     step,
     setStep,
     isLoading,
+    isUninstallMode,
     systemInfo,
     installPath,
     setInstallPath: updateInstallPath,
+    browseInstallPath,
     createDesktopShortcut,
     setCreateDesktopShortcut,
     createStartMenuShortcut,
@@ -192,8 +222,10 @@ export function useInstaller(config: InstallerConfig) {
     runningProcesses,
     errorMessage,
     startInstall: proceedToInstall,
+    cancelInstall,
     terminateRunningAndInstall,
     launchApp,
+    minimize,
     exit,
   };
 }

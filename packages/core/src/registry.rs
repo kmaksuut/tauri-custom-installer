@@ -50,8 +50,8 @@ pub fn register_uninstall_entry(options: &InstallOptions, total_size_bytes: u64)
         let _ = key.set_value("Publisher", &options.publisher);
         let _ = key.set_value("DisplayIcon", &icon_path);
         let _ = key.set_value("InstallLocation", &options.install_dir);
-        let _ = key.set_value("UninstallString", &format!("\"{}\"", uninstall_exe_path));
-        let _ = key.set_value("QuietUninstallString", &format!("\"{}\" /S", uninstall_exe_path));
+        let _ = key.set_value("UninstallString", &format!("\"{}\" --uninstall", uninstall_exe_path));
+        let _ = key.set_value("QuietUninstallString", &format!("\"{}\" --uninstall /S", uninstall_exe_path));
         let _ = key.set_value("EstimatedSize", &estimated_size_kb);
         let _ = key.set_value("NoModify", &1u32);
         let _ = key.set_value("NoRepair", &1u32);

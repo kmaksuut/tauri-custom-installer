@@ -8,12 +8,23 @@ export interface ExecOptions {
 export function runProcess(command: string, args: string[], options: ExecOptions = {}): Promise<void> {
   return new Promise((resolve, reject) => {
     const isWindows = process.platform === 'win32';
-    const proc = spawn(command, args, {
-      cwd: options.cwd || process.cwd(),
-      env: { ...process.env, ...options.env },
-      stdio: 'inherit',
-      shell: isWindows,
-    });
+    const fullCmd =
+      args.length > 0
+        ? `${command} ${args.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`
+        : command;
+
+    const proc = isWindows
+      ? spawn(fullCmd, [], {
+          cwd: options.cwd || process.cwd(),
+          env: { ...process.env, ...options.env },
+          stdio: 'inherit',
+          shell: true,
+        })
+      : spawn(command, args, {
+          cwd: options.cwd || process.cwd(),
+          env: { ...process.env, ...options.env },
+          stdio: 'inherit',
+        });
 
     proc.on('close', (code) => {
       if (code === 0) {

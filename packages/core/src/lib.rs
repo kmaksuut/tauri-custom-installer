@@ -10,6 +10,7 @@ pub mod uninstaller;
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
+pub use extractor::set_embedded_payload;
 pub use models::*;
 pub use uninstaller::run_worker_cleanup;
 
@@ -28,11 +29,15 @@ pub fn check_worker_or_silent_mode(app_name: &str, app_id: &str, executable_name
 
     // 2. Silent uninstallation mode: `--uninstall /S` or `/S --uninstall`
     let is_silent = args.iter().any(|a| a.eq_ignore_ascii_case("/S") || a == "--silent");
-    let is_uninstall = args.iter().any(|a| a == "--uninstall");
+    let is_uninstall = commands::detect_uninstall_mode();
 
     if is_silent && is_uninstall {
         if let Ok(exe_path) = std::env::current_exe() {
-            let install_dir = exe_path.parent().unwrap_or(std::path::Path::new("")).to_string_lossy().to_string();
+            let install_dir = exe_path
+                .parent()
+                .unwrap_or(std::path::Path::new(""))
+                .to_string_lossy()
+                .to_string();
             let options = UninstallOptions {
                 app_id: app_id.to_string(),
                 install_dir,
@@ -61,7 +66,8 @@ pub fn check_worker_or_silent_mode(app_name: &str, app_id: &str, executable_name
                 std::io::Cursor::new(payload_bytes),
                 &target_dir,
                 |_| {},
-            ).unwrap_or(archive_size);
+            )
+            .unwrap_or(archive_size);
 
             if let Ok(current_exe) = std::env::current_exe() {
                 let uninstaller_dest = target_dir.join("uninstall.exe");
@@ -97,8 +103,7 @@ pub fn check_worker_or_silent_mode(app_name: &str, app_id: &str, executable_name
     }
 }
 
-/// Initializes the `tauri-custom-installer` Tauri v2 plugin
-pub fn init<R: Runtime>() -> TauriPlugin<R> {
+fn handle_worker_arg() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() >= 5 && args[1] == "--worker-cleanup" {
         let target_dir = &args[2];
@@ -107,16 +112,44 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         run_worker_cleanup(target_dir, app_id, app_name);
         std::process::exit(0);
     }
+}
+
+/// Registers all custom installer IPC commands directly onto a `tauri::Builder`.
+/// This is the recommended way to wire up the installer backend in Tauri v2.
+pub fn register<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    handle_worker_arg();
+
+    builder.invoke_handler(tauri::generate_handler![
+        commands::get_system_info,
+        commands::validate_install_path,
+        commands::select_folder,
+        commands::check_running,
+        commands::kill_running,
+        commands::start_installation,
+        commands::cancel_installation,
+        commands::launch_installed_app,
+        commands::start_uninstallation,
+        commands::minimize_installer,
+        commands::exit_installer
+    ])
+}
+
+/// Initializes the `tauri-custom-installer` Tauri v2 plugin
+pub fn init<R: Runtime>() -> TauriPlugin<R> {
+    handle_worker_arg();
 
     Builder::new("custom-installer")
         .invoke_handler(tauri::generate_handler![
             commands::get_system_info,
             commands::validate_install_path,
+            commands::select_folder,
             commands::check_running,
             commands::kill_running,
             commands::start_installation,
+            commands::cancel_installation,
             commands::launch_installed_app,
             commands::start_uninstallation,
+            commands::minimize_installer,
             commands::exit_installer
         ])
         .build()

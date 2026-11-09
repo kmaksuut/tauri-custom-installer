@@ -11,6 +11,7 @@ pub struct SystemInfo {
     pub is_already_installed: bool,
     pub existing_version: Option<String>,
     pub existing_install_path: Option<String>,
+    pub is_uninstall_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

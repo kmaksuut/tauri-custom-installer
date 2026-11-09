@@ -40,6 +40,20 @@ function promptChoice(question: string, choices: string[], defaultIndex = 0): Pr
   });
 }
 
+function findDirUpwards(startDir: string, subPath: string): string | null {
+  let curr = path.resolve(startDir);
+  while (curr) {
+    const candidate = path.join(curr, subPath);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = path.dirname(curr);
+    if (parent === curr) break;
+    curr = parent;
+  }
+  return null;
+}
+
 export async function runInit(options: InitOptions): Promise<void> {
   const cwd = process.cwd();
   let template = options.template;
@@ -58,6 +72,7 @@ export async function runInit(options: InitOptions): Promise<void> {
     );
     template = frameworkMap[choice] || 'react';
   }
+
   const targetDir = path.join(cwd, 'installer');
 
   console.log(pc.cyan(`\n✨ Initializing Tauri Custom Installer with template: ${pc.bold(template)}`));
@@ -69,25 +84,17 @@ export async function runInit(options: InitOptions): Promise<void> {
   }
 
   const appConfig = detectAppConfig(cwd);
-
-  // Locate template directory by checking relative locations
-  const candidates = [
-    path.resolve(__dirname, '..', '..', 'templates', template),
-    path.resolve(__dirname, '..', 'templates', template),
-    path.resolve(__dirname, '..', '..', '..', 'templates', template),
-    path.resolve(__dirname, '..', '..', '..', '..', 'templates', template),
-  ];
-
-  let templateDir: string | null = null;
-  for (const cand of candidates) {
-    if (fs.existsSync(cand)) {
-      templateDir = cand;
-      break;
-    }
+  if (options.name) {
+    appConfig.appName = options.name;
   }
 
+  // Locate template directory by checking relative locations from CLI __dirname or cwd
+  const templateDir =
+    findDirUpwards(__dirname, path.join('templates', template)) ||
+    findDirUpwards(cwd, path.join('templates', template));
+
   if (!templateDir) {
-    console.error(pc.red(`❌ Template '${template}' not found in any candidate path.`));
+    console.error(pc.red(`❌ Template '${template}' not found.`));
     console.error(pc.gray(`Available templates: react, svelte, vue, vanilla`));
     process.exit(1);
   }
@@ -95,24 +102,36 @@ export async function runInit(options: InitOptions): Promise<void> {
   // Copy template files recursively
   copyDirSync(templateDir, targetDir);
 
-  // Customize installer/package.json for local monorepo vs npm
+  // Write installer/src/installer.config.json with real app metadata
+  const installerConfigPath = path.join(targetDir, 'src', 'installer.config.json');
+  const installerConfigData = {
+    appName: appConfig.appName,
+    appId: appConfig.identifier,
+    appVersion: appConfig.version,
+    publisher: appConfig.publisher,
+    executableName: appConfig.executableName,
+    requiredBytes: 50 * 1024 * 1024,
+  };
+  fs.mkdirSync(path.dirname(installerConfigPath), { recursive: true });
+  fs.writeFileSync(installerConfigPath, JSON.stringify(installerConfigData, null, 2));
+
+  // Determine if cwd is inside the tauri-custom-installer monorepo or an external project
+  const monorepoClientDir = findDirUpwards(cwd, path.join('packages', 'client'));
+  const cliBundledClientDir = findDirUpwards(__dirname, path.join('packages', 'client'));
+
   const installerPkgPath = path.join(targetDir, 'package.json');
   if (fs.existsSync(installerPkgPath)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(installerPkgPath, 'utf8'));
-      if (pkg.dependencies && pkg.dependencies['@tauri-custom-installer/client'] === 'workspace:*') {
-        // Find packages/client by checking parent directories
-        let packagesDir = path.resolve(cwd);
-        while (packagesDir && !fs.existsSync(path.join(packagesDir, 'packages', 'client'))) {
-          const parent = path.dirname(packagesDir);
-          if (parent === packagesDir) break;
-          packagesDir = parent;
-        }
-
-        const clientAbsPath = path.join(packagesDir, 'packages', 'client');
-        if (fs.existsSync(clientAbsPath)) {
-          const clientRelPath = path.relative(targetDir, clientAbsPath).replace(/\\/g, '/');
+      if (pkg.dependencies) {
+        if (monorepoClientDir) {
+          const clientRelPath = path.relative(targetDir, monorepoClientDir).replace(/\\/g, '/');
           pkg.dependencies['@tauri-custom-installer/client'] = `file:${clientRelPath}`;
+        } else if (cliBundledClientDir) {
+          // External project: vendor client SDK into installer/.tci-sdk/client for offline/git installs
+          const vendoredClientDir = path.join(targetDir, '.tci-sdk', 'client');
+          copyDirSync(cliBundledClientDir, vendoredClientDir);
+          pkg.dependencies['@tauri-custom-installer/client'] = 'file:./.tci-sdk/client';
         } else {
           pkg.dependencies['@tauri-custom-installer/client'] = '^0.1.0';
         }
@@ -123,30 +142,41 @@ export async function runInit(options: InitOptions): Promise<void> {
     }
   }
 
-  // Customize installer/src-tauri/Cargo.toml for local monorepo
+  // Customize installer/src-tauri/Cargo.toml
+  const monorepoCoreDir = findDirUpwards(cwd, path.join('packages', 'core'));
+  const cliBundledCoreDir = findDirUpwards(__dirname, path.join('packages', 'core'));
+
   const installerCargoPath = path.join(targetDir, 'src-tauri', 'Cargo.toml');
   if (fs.existsSync(installerCargoPath)) {
     try {
       let cargoStr = fs.readFileSync(installerCargoPath, 'utf8');
-        let packagesDir = path.resolve(cwd);
-        while (packagesDir && !fs.existsSync(path.join(packagesDir, 'packages', 'core'))) {
-          const parent = path.dirname(packagesDir);
-          if (parent === packagesDir) break;
-          packagesDir = parent;
-        }
+      const cargoPkgName = `${appConfig.appName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-installer`;
+      cargoStr = cargoStr.replace(
+        /name\s*=\s*"tauri-custom-installer-template-[^"]*"/,
+        `name = "${cargoPkgName}"`
+      );
 
-        const coreAbsPath = path.join(packagesDir, 'packages', 'core');
-        if (fs.existsSync(coreAbsPath)) {
-          const coreRelPath = path.relative(path.join(targetDir, 'src-tauri'), coreAbsPath).replace(/\\/g, '/');
-          const cargoPkgName = `${appConfig.appName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-installer`;
-          cargoStr = cargoStr.replace(/name\s*=\s*"tauri-custom-installer-template-[^"]*"/, `name = "${cargoPkgName}"`);
-          cargoStr = cargoStr.replace(/path\s*=\s*"[^"]*packages\/core"/g, `path = "${coreRelPath}"`);
-          fs.writeFileSync(installerCargoPath, cargoStr);
+      if (monorepoCoreDir) {
+        const coreRelPath = path
+          .relative(path.join(targetDir, 'src-tauri'), monorepoCoreDir)
+          .replace(/\\/g, '/');
+        cargoStr = cargoStr.replace(/path\s*=\s*"[^"]*packages\/core"/g, `path = "${coreRelPath}"`);
+      } else if (cliBundledCoreDir) {
+        // External project: vendor core crate into installer/src-tauri/core and isolate workspace
+        const vendoredCoreDir = path.join(targetDir, 'src-tauri', 'core');
+        copyDirSync(cliBundledCoreDir, vendoredCoreDir);
+        cargoStr = cargoStr.replace(/path\s*=\s*"[^"]*packages\/core"/g, `path = "./core"`);
+        if (!cargoStr.includes('[workspace]')) {
+          cargoStr += '\n[workspace]\n';
         }
+      }
+      fs.writeFileSync(installerCargoPath, cargoStr);
     } catch {
       // ignore
     }
   }
+
+  // Customize installer/src-tauri/tauri.conf.json
   const tauriConfPath = path.join(targetDir, 'src-tauri', 'tauri.conf.json');
   if (fs.existsSync(tauriConfPath)) {
     try {
@@ -166,20 +196,25 @@ export async function runInit(options: InitOptions): Promise<void> {
     try {
       const pkg = JSON.parse(fs.readFileSync(rootPkgPath, 'utf8'));
       pkg.scripts = pkg.scripts || {};
-      pkg.scripts['installer:dev'] = 'tauri-custom-installer dev';
-      pkg.scripts['installer:build'] = 'tauri-custom-installer build';
+      if (!pkg.scripts['installer:dev']) {
+        pkg.scripts['installer:dev'] = 'tauri-custom-installer dev';
+      }
+      if (!pkg.scripts['installer:build']) {
+        pkg.scripts['installer:build'] = 'tauri-custom-installer build';
+      }
       fs.writeFileSync(rootPkgPath, JSON.stringify(pkg, null, 2));
-      console.log(pc.green(`✔ Added installer scripts to package.json`));
+      console.log(pc.green(`✔ Configured installer scripts in package.json`));
     } catch {
       // ignore
     }
   }
 
+  console.log(pc.green(`✔ Synced application metadata (${appConfig.appName} v${appConfig.version}) into installer/src/installer.config.json`));
   console.log(pc.green(`\n✔ Custom installer initialized successfully in ./installer/`));
   console.log(pc.cyan(`\nNext steps:`));
   console.log(`  1. ${pc.bold('cd installer && bun install')} (or npm install)`);
-  console.log(`  2. ${pc.bold('bun run ../node_modules/.bin/tauri-custom-installer dev')} (to customize your UI)`);
-  console.log(`  3. ${pc.bold('tauri-custom-installer build')} (to compile your custom setup executable)\n`);
+  console.log(`  2. ${pc.bold('bun run installer:dev')} (to preview & customize your installer UI)`);
+  console.log(`  3. ${pc.bold('bun run installer:build')} (to compile your standalone setup .exe)\n`);
 }
 
 function copyDirSync(src: string, dest: string) {
@@ -190,7 +225,12 @@ function copyDirSync(src: string, dest: string) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
 
-    if (entry.name === 'node_modules' || entry.name === 'target' || entry.name === '.git') {
+    if (
+      entry.name === 'node_modules' ||
+      entry.name === 'target' ||
+      entry.name === 'dist' ||
+      entry.name === '.git'
+    ) {
       continue;
     }
 
