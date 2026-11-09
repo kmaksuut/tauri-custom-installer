@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -17,6 +17,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Sync Repository Description
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X PATCH "repos/${{ github.repository }}" \
+            -f description="Tauri Custom Installer with Tauri v2 — Build modern, web-based (React, Svelte, Vue, Solid, Vanilla) custom installers for Tauri v2 using Tauri v2 itself" || true
 
       - name: Setup Node.js for GitHub Packages
         uses: actions/setup-node@v4
