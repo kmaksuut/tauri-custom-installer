@@ -53,10 +53,11 @@ Run the initializer and pick your preferred framework:
 bunx tci init
 
 # Or pick your framework directly in one command:
-bunx tci init --template react     # ⚛️ React 19 + Tailwind CSS + Lucide (Default)
-bunx tci init --template svelte    # 🧡 Svelte 5 + TypeScript
-bunx tci init --template vue       # 💚 Vue 3 + TypeScript
-bunx tci init --template vanilla   # 🍦 Vanilla HTML / CSS / TypeScript
+bunx tci init --template react          # ⚛️ React 19 + Tailwind CSS + Lucide (Default)
+bunx tci init --template futuristic-3d  # 🚀 3D Holographic Gaming (Three.js WebGL + Audio SFX)
+bunx tci init --template svelte         # 🧡 Svelte 5 + TypeScript
+bunx tci init --template vue            # 💚 Vue 3 + TypeScript
+bunx tci init --template vanilla        # 🍦 Vanilla HTML / CSS / TypeScript
 ```
 
 > **Note:** If an `installer/` directory already exists, append `--force` to re-initialize:  
@@ -123,6 +124,25 @@ export function App() {
   );
 }
 ```
+
+---
+
+### 🚀 Futuristic 3D Gaming (`--template futuristic-3d` or `--template 3d`)
+
+- **Main Files**: `installer/src/App.tsx` & `installer/src/components/ThreeCanvas.tsx`
+- **3D Engine**: Three.js WebGL (Interactive Mouse Drag & Orbit Physics)
+- **Audio Engine**: Procedural Web Audio API Synthesizer (Sci-Fi hover, click & warp drive SFX)
+
+```tsx
+// Interactive 3D Canvas reacts dynamically to installation state and mouse movements:
+<ThreeCanvas stage={progress.stage || step} percent={progress.percent} />
+```
+
+**Key Features:**
+- 🎮 **Interactive 3D Holographic Core**: Click & drag with mouse to orbit and inspect the spinning quantum reactor in real-time.
+- 🌌 **Warp Speed Particle Drive**: Particle stream accelerates dynamically into a high-speed warp tunnel during file extraction.
+- 🔊 **Built-in Procedural Audio SFX**: High-tech cyber sound effects on button clicks and stage transitions with an in-window Mute/Unmute toggle.
+- ⚡ **Telemetry HUD**: Live MB/s speed gauges, ETA countdown, and sector file readouts.
 
 ---
 
@@ -280,4 +300,4 @@ The generated `dist/MyApp-Setup.exe` accepts standard switches:
 
 ## 📄 License
 
-MIT © [kmaksuut](https://github.com/kmaksuut)
+MIT © [kmaksuut](https://github.com/kmaksuut) & Tauri Custom Installer Contributors.

@@ -54,6 +54,13 @@ async function runInit(options) {
     const cwd = process.cwd();
     const pm = (0, config_1.detectPackageManager)(cwd);
     let template = options.template;
+    if (template === '3d' ||
+        template === 'gaming' ||
+        template === 'gaming-3d' ||
+        template === 'three' ||
+        template === 'threejs') {
+        template = 'futuristic-3d';
+    }
     let installMode = options.mode || 'perUser';
     if (!template) {
         if (options.yes) {
@@ -62,6 +69,7 @@ async function runInit(options) {
         else {
             const frameworkMap = {
                 'React 19 + Tailwind CSS + Lucide (Recommended)': 'react',
+                'Futuristic 3D Gaming (Three.js WebGL Hologram + Audio SFX)': 'futuristic-3d',
                 'Svelte 5 + TypeScript': 'svelte',
                 'Vue 3 + TypeScript': 'vue',
                 'Vanilla HTML/CSS/TypeScript': 'vanilla',
@@ -98,7 +106,7 @@ async function runInit(options) {
             findDirUpwards(cwd, node_path_1.default.join('templates', template));
     if (!templateDir) {
         console.error(picocolors_1.default.red(`❌ Template '${template}' not found.`));
-        console.error(picocolors_1.default.gray(`Available templates: react, svelte, vue, vanilla`));
+        console.error(picocolors_1.default.gray(`Available templates: react, futuristic-3d, svelte, vue, vanilla`));
         process.exit(1);
     }
     copyDirSync(templateDir, targetDir);

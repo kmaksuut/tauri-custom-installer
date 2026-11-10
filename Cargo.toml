@@ -4,6 +4,7 @@ members = [
     "packages/core",
     "packages/runtime",
     "templates/react/src-tauri",
+    "templates/futuristic-3d/src-tauri",
     "templates/vanilla/src-tauri",
     "templates/svelte/src-tauri",
     "templates/vue/src-tauri",

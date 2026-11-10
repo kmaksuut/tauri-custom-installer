@@ -25,7 +25,7 @@ function createCliProgram() {
     program
         .command('init')
         .description('Initialize custom installer directory in your Tauri v2 project')
-        .option('-t, --template <template>', 'UI template to use: react, svelte, vue, vanilla')
+        .option('-t, --template <template>', 'UI template to use: react, futuristic-3d, svelte, vue, vanilla')
         .option('-n, --name <name>', 'Name of the application')
         .option('-m, --mode <mode>', 'Default install scope: perUser, perMachine, both')
         .option('-y, --yes', 'Skip interactive prompts and use defaults')

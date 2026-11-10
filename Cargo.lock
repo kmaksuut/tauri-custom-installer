@@ -3202,6 +3202,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-custom-installer-template-futuristic-3d"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-custom-installer-core",
+]
+
+[[package]]
 name = "tauri-custom-installer-template-react"
 version = "0.1.0"
 dependencies = [

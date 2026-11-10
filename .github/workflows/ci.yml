@@ -34,7 +34,7 @@ jobs:
           bun run build
 
   build-templates:
-    name: Template Frontend Builds (React, Svelte, Vue, Vanilla)
+    name: Template Frontend Builds (React, Futuristic 3D, Svelte, Vue, Vanilla)
     needs: test-client-and-cli
     runs-on: windows-latest
     steps:
@@ -48,6 +48,11 @@ jobs:
       - name: Build React Template
         run: |
           cd templates/react
+          bun install
+          bun run build
+      - name: Build Futuristic 3D Template
+        run: |
+          cd templates/futuristic-3d
           bun install
           bun run build
       - name: Build Svelte 5 Template

@@ -1,0 +1,8 @@
+{
+  "appName": "My Awesome App",
+  "appId": "com.example.myawesomeapp",
+  "appVersion": "1.0.0",
+  "publisher": "Antigravity Studio",
+  "executableName": "my-awesome-app.exe",
+  "requiredBytes": 78643200
+}

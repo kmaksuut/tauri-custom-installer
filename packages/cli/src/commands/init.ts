@@ -60,6 +60,15 @@ export async function runInit(options: InitOptions): Promise<void> {
   const cwd = process.cwd();
   const pm = detectPackageManager(cwd);
   let template = options.template;
+  if (
+    template === '3d' ||
+    template === 'gaming' ||
+    template === 'gaming-3d' ||
+    template === 'three' ||
+    template === 'threejs'
+  ) {
+    template = 'futuristic-3d';
+  }
   let installMode: 'perUser' | 'perMachine' | 'both' = options.mode || 'perUser';
 
   if (!template) {
@@ -68,6 +77,7 @@ export async function runInit(options: InitOptions): Promise<void> {
     } else {
       const frameworkMap: Record<string, string> = {
         'React 19 + Tailwind CSS + Lucide (Recommended)': 'react',
+        'Futuristic 3D Gaming (Three.js WebGL Hologram + Audio SFX)': 'futuristic-3d',
         'Svelte 5 + TypeScript': 'svelte',
         'Vue 3 + TypeScript': 'vue',
         'Vanilla HTML/CSS/TypeScript': 'vanilla',
@@ -121,7 +131,7 @@ export async function runInit(options: InitOptions): Promise<void> {
 
   if (!templateDir) {
     console.error(pc.red(`❌ Template '${template}' not found.`));
-    console.error(pc.gray(`Available templates: react, svelte, vue, vanilla`));
+    console.error(pc.gray(`Available templates: react, futuristic-3d, svelte, vue, vanilla`));
     process.exit(1);
   }
 
