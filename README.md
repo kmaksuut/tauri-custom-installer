@@ -103,88 +103,152 @@ This compiles your Tauri app, obfuscates the frontend JavaScript, encrypts the S
 
 ---
 
-## 🔐 Certificates & Code Signing: Everything You Need to Know
+## 🔐 Certificates & Code Signing: Complete Guide
 
-There are **two completely different certificate concepts** developers encounter. `tauri-custom-installer` handles both natively:
+There are **two completely different certificate workflows** in Windows installer development. Developers frequently confuse them, but `tauri-custom-installer` handles both natively with zero shell-outs and strict security boundaries:
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ 1. Authenticode Code Signing (Signs Your .exe)                                         │
-│    • Purpose: Eliminates Windows SmartScreen warnings ("Unknown Publisher").          │
-│    • Tooling: Uses signtool.exe via tci.config.json `sign` configuration.              │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ 2. Windows Certificate Store Installation (Installs CA/Publisher into Windows)        │
-│    • Purpose: Enrolls private Root CAs or publisher certs on the user's machine.       │
-│    • Tooling: Native Win32 CryptoAPI via tci.config.json `certificates` array.         │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ Workflow 1: Authenticode Code Signing (Signs the Setup.exe binary)                      │
+│   • Purpose: Eliminates Windows SmartScreen warnings ("Unknown Publisher").            │
+│   • Mechanism: Uses signtool.exe via tci.config.json `sign` configuration.              │
+│   • Result: The output YourApp-Setup.exe carries an Authenticode PKCS#7 signature.      │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────┘
+│ Workflow 2: Windows Certificate Store Enrollment (Bundling & Installing CA certs)       │
+│   • Purpose: Installs private Root CAs or publisher certificates on the user's PC.      │
+│   • Mechanism: Native Win32 CryptoAPI via tci.config.json `certificates` array.         │
+│   • Result: Target machine trusts your internal API, driver, or enterprise PKI.        │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1. Authenticode Code Signing (Signing the Installer Executable)
+### Recommended Project Directory Structure
 
-#### Local Development Testing:
-1. Verify that `signtool.exe` is available:
+Store all certificate assets inside a dedicated `./certs` folder in your project root:
+
+```text
+my-tauri-app/
+├── certs/
+│   ├── codesign.pfx           # Code signing certificate (NEVER committed to git!)
+│   ├── codesign.cer           # Public code signing certificate
+│   └── enterprise-root-ca.cer # CA certificate to be installed into target Windows store
+├── installer/                 # Svelte / React / Vue installer UI
+├── src-tauri/                 # Tauri v2 backend
+├── tci.config.json            # Authoritative configuration linking to ./certs
+└── .gitignore                 # Automatically ignores certs/, *.pfx, *.key, etc.
+```
+
+> [!CAUTION]
+> **Secret Hygiene**: `npx tci init` automatically adds `certs/`, `*.pfx`, `*.p12`, `*.key`, and `.tci/` to your `.gitignore`. Never commit private keys or `.pfx` files to version control!
+
+---
+
+### Workflow 1: Code Signing Your Installer (`Setup.exe`)
+
+Code signing proves your application's authenticity and prevents Windows SmartScreen from displaying the blue *"Windows protected your PC / Unknown Publisher"* prompt.
+
+#### Method A: Local Development & Testing (Self-Signed PFX)
+1. **Verify `signtool.exe` availability:**
    ```bash
    npx @tauri-custom-installer/cli cert check
    ```
-2. Generate a temporary local development certificate:
+   *(Locates `signtool.exe` in Windows Kits 10/11 or Visual Studio tools automatically).*
+
+2. **Generate a local test certificate and password:**
    ```bash
-   npx @tauri-custom-installer/cli cert generate --out-dir ./certs
+   npx @tauri-custom-installer/cli cert generate --out-dir ./certs --subject "My Dev Certificate"
    ```
-3. Configure `tci.config.json`:
+   This generates `./certs/dev-cert.pfx` and `./certs/dev-cert.cer` and displays a temporary random password.
+
+3. **Configure `tci.config.json`:**
    ```jsonc
    {
      "sign": {
        "pfxPath": "./certs/dev-cert.pfx",
-       "passwordEnv": "TCI_PFX_PASSWORD", // Set $env:TCI_PFX_PASSWORD in your shell
+       "passwordEnv": "TCI_PFX_PASSWORD", // Reads password safely from environment variable
        "timestampUrl": "http://timestamp.digicert.com"
      }
    }
    ```
 
-#### Production Signing (Hardware Token / Certificate Store):
-If your code signing certificate is stored in your Windows Certificate Store (e.g., EV Hardware Token / YubiKey):
+4. **Set environment variable and build:**
+   ```powershell
+   # Windows PowerShell
+   $env:TCI_PFX_PASSWORD = "your-password-here"
+   npx @tauri-custom-installer/cli build
+   ```
+
+#### Method B: Production Signing with Hardware Token / Store Thumbprint (EV Cert)
+If using an Extended Validation (EV) certificate, YubiKey, or Windows Certificate Store token:
 ```jsonc
 {
   "sign": {
-    "certificateThumbprint": "1a2b3c4d5e6f...",
+    "certificateThumbprint": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
     "timestampUrl": "http://timestamp.digicert.com"
   }
 }
 ```
 
-> [!IMPORTANT]
-> **Authenticode Coexistence Guarantee**: When `signtool.exe` signs a binary, it appends a `WIN_CERTIFICATE` structure at the end of the file. `tauri-custom-installer`'s footer scanner automatically accounts for Authenticode signatures, meaning signing will **never** corrupt the installer footer or payload.
+#### Method C: GitHub Actions CI/CD Signing
+In your CI/CD pipeline, encode your PFX file as a Base64 GitHub Secret (`CERT_PFX_BASE64`) and pass the password as `CERT_PASSWORD`:
+```yaml
+- name: Decode Code Signing Certificate
+  shell: pwsh
+  run: |
+    [System.IO.File]::WriteAllBytes("./certs/codesign.pfx", [System.Convert]::FromBase64String("${{ secrets.CERT_PFX_BASE64 }}"))
+
+- name: Build and Sign Installer
+  shell: pwsh
+  env:
+    TCI_PFX_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+  run: npx @tauri-custom-installer/cli build
+```
+
+> [!NOTE]
+> **Authenticode Coexistence Guarantee**: When `signtool.exe` signs the executable, it appends an Authenticode `WIN_CERTIFICATE` structure at the end of the PE file. `packages/core` features an Authenticode-tolerant footer scanner that scans backwards across the signature trailer, guaranteeing that code signing will **never** corrupt the SFX archive or payload integrity.
 
 ---
 
-### 2. Windows Certificate Store Installation (Bundling Certificates)
+### Workflow 2: Bundling & Installing Certificates into the User's Windows Store
 
-If your application needs to install a custom root certificate, enterprise CA, or trusted publisher certificate onto the target Windows machine during installation:
+If your application requires target Windows machines to trust an internal CA, localhost HTTPS proxy certificate, or enterprise root certificate:
 
-1. Inspect your `.cer` file's SHA-256 thumbprint:
+1. **Obtain your public certificate** (`.cer` or `.crt` in DER or PEM format). Place it in `./certs/my-root-ca.cer`.
+
+2. **Inspect and verify its SHA-256 thumbprint:**
    ```bash
-   npx @tauri-custom-installer/cli cert verify ./certs/my-ca.cer
+   npx @tauri-custom-installer/cli cert verify ./certs/my-root-ca.cer
    ```
-2. Add it to `tci.config.json`:
+   *Output example:*
+   ```text
+   ✔ Certificate verified: ./certs/my-root-ca.cer
+     Subject: CN=Acme Internal Root CA, O=Acme Corp
+     Format:  ASN.1 DER X.509
+     SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+   ```
+
+3. **Declare it in `tci.config.json`:**
    ```jsonc
    {
      "certificates": [
        {
-         "path": "./certs/my-ca.cer",
-         "store": "TrustedPublisher", // "Root" | "TrustedPublisher" | "CA" | "My"
-         "scope": "currentUser",      // "currentUser" (no UAC) or "localMachine" (requires admin)
+         "path": "./certs/my-root-ca.cer",
+         "store": "TrustedPublisher", // Options: "Root" | "TrustedPublisher" | "CA" | "My"
+         "scope": "currentUser",      // "currentUser" (No UAC prompt) or "localMachine" (Requires Admin)
          "sha256Thumbprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
        }
      ]
    }
    ```
 
-#### Why is this secure?
-- **Zero Shell-Out**: Executes directly via native Win32 `CertOpenStore` and `CertAddEncodedCertificateToStore`. No `powershell` or `certutil.exe` subprocesses are spawned.
-- **SHA-256 Pinning**: Verifies that the certificate bytes strictly match `sha256Thumbprint` before installation.
-- **Reparse-Point & Symlink Guard**: Blocks path traversal attacks and junction escapes.
-- **Dry-Run Safe**: In `TCI_DRY_RUN=1` development mode, certificates are parsed and validated without touching system stores.
+#### How the Bundled Installation Works:
+1. **At Build Time (`tci build`)**: The CLI parses the certificate, verifies that its SHA-256 digest matches `sha256Thumbprint`, stages it into `.tci/certs/`, and writes it into the encrypted SFX `manifest.json`.
+2. **At Install Time (on the target PC)**: Rust core (`packages/core/src/certs.rs`):
+   - Re-verifies the certificate's ASN.1 DER structure and pinned SHA-256 thumbprint.
+   - Rejects any file path attempting path traversal (`..`) or NTFS junction/symlink escapes.
+   - Enrolls the certificate directly via native Win32 CryptoAPI functions (`CertOpenStore` and `CertAddEncodedCertificateToStore`).
+   - Spawns **zero** subprocesses (`powershell.exe` or `certutil.exe` are never used).
+   - In dry-run mode (`TCI_DRY_RUN=1`), validation passes while system stores remain untouched.
 
 ---
 
