@@ -4,16 +4,40 @@ Modern Windows installer wizard built with **Vue 3 Composition API** (`<script s
 
 ## Quick Start
 
+### 1. Initialize Template
+
 Initialize this template inside your Tauri v2 repository:
 
 ```bash
+# Using Bun:
+bunx @tauri-custom-installer/cli init --template vue
+
+# Or using npx:
 npx @tauri-custom-installer/cli init --template vue
 ```
+
+### 2. Install & Start Development Server
 
 Start the Vite hot-reload server with browser simulation:
 
 ```bash
+# Using Bun:
+cd installer && bun install
+bun run dev
+
+# Or using npm:
+cd installer && npm install
 npm run dev
+```
+
+### 3. Build Production Installer
+
+```bash
+# Using Bun:
+bunx tci build
+
+# Or using npx:
+npx tci build
 ```
 
 Pass simulation query strings in the browser to verify every UI state:

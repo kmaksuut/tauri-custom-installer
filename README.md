@@ -57,30 +57,40 @@ Run `init` inside your Tauri v2 project and pick the framework you love:
 
 ## 🚀 Step-by-Step: Adding to an Existing Tauri Project
 
+`tauri-custom-installer` has first-class support for **Bun**, **npm**, **pnpm**, and **yarn**. Bun delivers sub-second scaffolding and bundling.
+
 ### Step 1: Scaffold Installer UI (Example: Svelte Template)
 
-Run in your Tauri v2 project root:
+Run from your Tauri v2 project root:
 
 ```bash
-# Svelte 5 Template
+# Using Bun:
+bunx @tauri-custom-installer/cli init --template svelte
+
+# Or using npx:
 npx @tauri-custom-installer/cli init --template svelte
 
-# Or choose any other template:
-# npx @tauri-custom-installer/cli init --template react
-# npx @tauri-custom-installer/cli init --template futuristic-3d
+# Or choose any other template (react, futuristic-3d / 3d, vue, vanilla):
+# bunx @tauri-custom-installer/cli init --template futuristic-3d
+# bunx @tauri-custom-installer/cli init --template react
 ```
 
 This command automatically:
 - Creates an `./installer` folder with your chosen template.
 - Generates `tci.config.json` in your project root.
+- Adds `installer:dev` and `installer:build` helper scripts to your root `package.json`.
 - Updates `.gitignore` to prevent secret leaks (`certs/`, `*.pfx`, `*.key`, `.tci/`).
 
-### Step 2: Develop & Preview in Hot-Reload Simulator
-
-Test your installer in your favorite browser with hot module replacement (HMR):
+### Step 2: Install Dependencies & Preview with Hot-Reload
 
 ```bash
-npx @tauri-custom-installer/cli dev
+# Navigate to installer directory and install dependencies:
+cd installer
+bun install      # or: npm install
+
+# Start the Vite development server with mock API simulator:
+bun run dev      # or: npm run dev
+# (or from project root: bunx tci dev / npx tci dev)
 ```
 
 Append query parameters in your browser URL to test every possible edge case:
@@ -91,12 +101,26 @@ Append query parameters in your browser URL to test every possible edge case:
 - `http://localhost:5173/?scenario=uninstall` — Previews the uninstaller view.
 
 > [!TIP]
-> Want to test the real native Windows window? Run `npx @tauri-custom-installer/cli dev --tauri`. This opens a native window in **Safe Sandbox Mode (`TCI_DRY_RUN=1`)** where registry writes are isolated under `HKCU\Software\tci-sandbox` without touching system settings.
+> **Native Windows Sandbox Mode**:
+> To test the real native Windows window instead of the browser:
+> ```bash
+> bunx tci dev --tauri
+> # or:
+> npx tci dev --tauri
+> ```
+> This opens a native window in **Safe Sandbox Mode (`TCI_DRY_RUN=1`)** where registry writes are isolated under `HKCU\Software\tci-sandbox` without modifying system settings.
 
 ### Step 3: Build Standalone Windows Installer (`-Setup.exe`)
 
 ```bash
-npx @tauri-custom-installer/cli build
+# Using Bun:
+bunx tci build
+
+# Using npm / npx:
+npx tci build
+
+# Or via package.json script:
+bun run installer:build   # or: npm run installer:build
 ```
 
 This compiles your Tauri app, obfuscates the frontend JavaScript, encrypts the SFX V2 sections, verifies certificates, and outputs your final installer to `target/tci/<AppName>-Setup.exe`.

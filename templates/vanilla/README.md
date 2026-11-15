@@ -4,16 +4,40 @@ Ultra-minimal, zero-framework Windows installer wizard built with plain **HTML**
 
 ## Quick Start
 
+### 1. Initialize Template
+
 Initialize this template inside your Tauri v2 application:
 
 ```bash
+# Using Bun:
+bunx @tauri-custom-installer/cli init --template vanilla
+
+# Or using npx:
 npx @tauri-custom-installer/cli init --template vanilla
 ```
+
+### 2. Install & Start Development Server
 
 Start the Vite dev server and inspect the simulated wizard in your browser:
 
 ```bash
+# Using Bun:
+cd installer && bun install
+bun run dev
+
+# Or using npm:
+cd installer && npm install
 npm run dev
+```
+
+### 3. Build Production Installer
+
+```bash
+# Using Bun:
+bunx tci build
+
+# Or using npx:
+npx tci build
 ```
 
 Append `?scenario=<name>` to test different states without building a Rust binary:

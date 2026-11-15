@@ -4,16 +4,40 @@ Lightweight, reactive Windows installer wizard built with **Svelte 5 Runes** (`$
 
 ## Quick Start
 
-Scaffold the Svelte template into your Tauri v2 project:
+### 1. Initialize Template
+
+Run in your Tauri v2 project root:
 
 ```bash
+# Using Bun:
+bunx @tauri-custom-installer/cli init --template svelte
+
+# Or using npx:
 npx @tauri-custom-installer/cli init --template svelte
 ```
 
-Run the Vite development server with the built-in browser mock engine:
+### 2. Install & Start Development Server
+
+Run the Vite development server with Hot Module Replacement and mock simulator:
 
 ```bash
+# Using Bun:
+cd installer && bun install
+bun run dev
+
+# Or using npm:
+cd installer && npm install
 npm run dev
+```
+
+### 3. Build Production Installer
+
+```bash
+# Using Bun:
+bunx tci build
+
+# Or using npx:
+npx tci build
 ```
 
 Preview specific edge-case scenarios by appending query parameters in your browser:

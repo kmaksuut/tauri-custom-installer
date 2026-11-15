@@ -4,18 +4,42 @@ Interactive, sci-fi / gaming-inspired Windows installer featuring a real-time **
 
 ## Quick Start
 
+### 1. Initialize Template
+
 Initialize this template using its primary name or any supported alias (`3d`, `gaming`, `gaming-3d`, `three`, `threejs`, `futuristic`):
 
 ```bash
+# Using Bun:
+bunx @tauri-custom-installer/cli init --template futuristic-3d
+# (or shorthand: bunx @tauri-custom-installer/cli init --template 3d)
+
+# Or using npx:
 npx @tauri-custom-installer/cli init --template futuristic-3d
-# or using a convenient alias:
-npx @tauri-custom-installer/cli init --template 3d
+# (or shorthand: npx @tauri-custom-installer/cli init --template 3d)
 ```
 
-Launch the interactive 3D preview in your browser:
+### 2. Install & Start Development Server
+
+Launch the interactive 3D preview in your browser with Hot Module Replacement:
 
 ```bash
+# Using Bun:
+cd installer && bun install
+bun run dev
+
+# Or using npm:
+cd installer && npm install
 npm run dev
+```
+
+### 3. Build Production Installer
+
+```bash
+# Using Bun:
+bunx tci build
+
+# Or using npx:
+npx tci build
 ```
 
 Simulate installer states in browser dev mode using query parameters:

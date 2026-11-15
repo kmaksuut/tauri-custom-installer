@@ -4,11 +4,17 @@ Command-line toolkit (`tci` / `tauri-custom-installer`) for scaffolding, develop
 
 ## Installation
 
-Install in your Tauri v2 workspace or run directly via `npx` / `bunx`:
+Install in your Tauri v2 workspace or run directly via `bunx` or `npx`:
 
 ```bash
+# Using Bun:
+bun add -d @tauri-custom-installer/cli
+# Or run without global/local install:
+bunx @tauri-custom-installer/cli init
+
+# Using npm:
 npm install -D @tauri-custom-installer/cli
-# or run without global install
+# Or run without global/local install:
 npx @tauri-custom-installer/cli init
 ```
 
@@ -21,6 +27,14 @@ Both `tci` and `tauri-custom-installer` bin aliases are exposed.
 Scaffolds an installer UI directory (`./installer` by default), writes `tci.config.json`, adds certificate/secret ignore rules to `.gitignore`, and installs workspace dependencies.
 
 ```bash
+# Using Bun:
+bunx @tauri-custom-installer/cli init --template react
+bunx @tauri-custom-installer/cli init --template futuristic-3d
+bunx @tauri-custom-installer/cli init --template svelte
+bunx @tauri-custom-installer/cli init --template vue
+bunx @tauri-custom-installer/cli init --template vanilla
+
+# Using npm / npx:
 npx @tauri-custom-installer/cli init --template react
 npx @tauri-custom-installer/cli init --template futuristic-3d
 npx @tauri-custom-installer/cli init --template svelte

@@ -4,18 +4,41 @@ Clean, responsive Windows installer wizard built with **React 19**, **Tailwind C
 
 ## Quick Start
 
+### 1. Initialize Template
+
 Scaffold this template directly inside your Tauri v2 project (React is the default template):
 
 ```bash
-npx @tauri-custom-installer/cli init
-# or explicitly:
+# Using Bun:
+bunx @tauri-custom-installer/cli init --template react
+# (or simply: bunx @tauri-custom-installer/cli init)
+
+# Or using npx:
 npx @tauri-custom-installer/cli init --template react
 ```
+
+### 2. Install & Start Development Server
 
 Start the hot-reloading UI development server with the built-in browser simulator:
 
 ```bash
+# Using Bun:
+cd installer && bun install
+bun run dev
+
+# Or using npm:
+cd installer && npm install
 npm run dev
+```
+
+### 3. Build Production Installer
+
+```bash
+# Using Bun:
+bunx tci build
+
+# Or using npx:
+npx tci build
 ```
 
 Simulate edge-case installer flows in the browser using URL query parameters:
