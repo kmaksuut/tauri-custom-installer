@@ -4,11 +4,16 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 use crate::models::AppManifest;
 
-/// 16-byte magic footer signature for single-file TCI SFX executables
+/// 16-byte magic footer signature for single-file TCI SFX executables (V1 plaintext sections)
 pub const TCI_FOOTER_MAGIC: [u8; 16] = *b"TCI_SFX_V1\0\x01\xfe\x20\x26\0";
+/// 16-byte magic footer signature for single-file TCI SFX executables (V2 armored UI + manifest)
+pub const TCI_FOOTER_MAGIC_V2: [u8; 16] = *b"TCI_SFX_V2\0\x02\xfe\x20\x26\0";
 pub const TCI_FOOTER_SIZE: usize = 136;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub const ARMOR_SECTION_UI: u8 = 1;
+pub const ARMOR_SECTION_MANIFEST: u8 = 2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct TciFooter {
     pub runtime_size: u64,
     pub ui_offset: u64,
@@ -19,6 +24,7 @@ pub struct TciFooter {
     pub manifest_size: u64,
     pub payload_sha256: [u8; 32],
     pub ui_sha256: [u8; 32],
+    pub is_v2_armored: bool,
 }
 
 impl TciFooter {
@@ -33,7 +39,12 @@ impl TciFooter {
         buf[48..56].copy_from_slice(&self.manifest_size.to_le_bytes());
         buf[56..88].copy_from_slice(&self.payload_sha256);
         buf[88..120].copy_from_slice(&self.ui_sha256);
-        buf[120..136].copy_from_slice(&TCI_FOOTER_MAGIC);
+        let magic = if self.is_v2_armored {
+            &TCI_FOOTER_MAGIC_V2
+        } else {
+            &TCI_FOOTER_MAGIC
+        };
+        buf[120..136].copy_from_slice(magic);
         buf
     }
 
@@ -42,9 +53,15 @@ impl TciFooter {
             return None;
         }
         let slice = &buf[buf.len() - TCI_FOOTER_SIZE..];
-        if slice[120..136] != TCI_FOOTER_MAGIC {
+        let magic = &slice[120..136];
+        let is_v2_armored = if magic == TCI_FOOTER_MAGIC_V2 {
+            true
+        } else if magic == TCI_FOOTER_MAGIC {
+            false
+        } else {
             return None;
-        }
+        };
+
         let runtime_size = u64::from_le_bytes(slice[0..8].try_into().ok()?);
         let ui_offset = u64::from_le_bytes(slice[8..16].try_into().ok()?);
         let ui_size = u64::from_le_bytes(slice[16..24].try_into().ok()?);
@@ -67,13 +84,39 @@ impl TciFooter {
             manifest_size,
             payload_sha256,
             ui_sha256,
+            is_v2_armored,
         })
+    }
+}
+
+/// Symmetric SHA-256 CTR-mode stream cipher used to armor V2 `ui.zip` and `manifest.json` sections.
+/// Keystream block `counter` is `SHA256("TCI_ARMOR_V2" || payload_sha256 || ui_sha256 || le_u64(runtime_size) || section_tag || le_u64(counter))`.
+pub fn transform_armor_bytes(
+    data: &mut [u8],
+    payload_sha256: &[u8; 32],
+    ui_sha256: &[u8; 32],
+    runtime_size: u64,
+    section_tag: u8,
+) {
+    let runtime_le = runtime_size.to_le_bytes();
+    for (block_idx, chunk) in data.chunks_mut(32).enumerate() {
+        let mut hasher = Sha256::new();
+        hasher.update(b"TCI_ARMOR_V2");
+        hasher.update(payload_sha256);
+        hasher.update(ui_sha256);
+        hasher.update(&runtime_le);
+        hasher.update([section_tag]);
+        hasher.update(&(block_idx as u64).to_le_bytes());
+        let keystream: [u8; 32] = hasher.finalize().into();
+        for (byte, ks) in chunk.iter_mut().zip(keystream.iter()) {
+            *byte ^= *ks;
+        }
     }
 }
 
 /// Reads the `TciFooter` from an executable path.
 /// Supports both unsigned binaries (footer at EOF) and Authenticode-signed binaries
-/// (where the Windows certificate table is appended after the footer).
+/// (where the Windows certificate table is appended after the footer), for both V1 and V2 footers.
 pub fn read_footer_from_path(exe_path: &Path) -> Option<TciFooter> {
     let mut file = File::open(exe_path).ok()?;
     let file_len = file.metadata().ok()?.len();
@@ -86,23 +129,27 @@ pub fn read_footer_from_path(exe_path: &Path) -> Option<TciFooter> {
     file.seek(SeekFrom::End(-(TCI_FOOTER_SIZE as i64))).ok()?;
     file.read_exact(&mut eof_buf).ok()?;
     if let Some(footer) = TciFooter::from_bytes(&eof_buf) {
-        if validate_footer_bounds(&footer, file_len) {
+        let footer_start = file_len - TCI_FOOTER_SIZE as u64;
+        if validate_footer_bounds(&footer, footer_start) {
             return Some(footer);
         }
     }
 
-    // 2. Authenticode-signed path: scan backwards up to 128 KB from EOF for TCI_FOOTER_MAGIC
+    // 2. Authenticode-signed path: scan backwards up to 128 KB from EOF for V2 or V1 magic
     let scan_window = file_len.min(131072) as usize;
+    let window_start = file_len - scan_window as u64;
     let mut tail = vec![0u8; scan_window];
-    file.seek(SeekFrom::End(-(scan_window as i64))).ok()?;
+    file.seek(SeekFrom::Start(window_start)).ok()?;
     file.read_exact(&mut tail).ok()?;
 
     if scan_window >= TCI_FOOTER_SIZE {
         for end in (TCI_FOOTER_SIZE..=scan_window).rev() {
-            if tail[end - 16..end] == TCI_FOOTER_MAGIC {
+            let magic_slice = &tail[end - 16..end];
+            if magic_slice == TCI_FOOTER_MAGIC_V2 || magic_slice == TCI_FOOTER_MAGIC {
                 let candidate = &tail[end - TCI_FOOTER_SIZE..end];
                 if let Some(footer) = TciFooter::from_bytes(candidate) {
-                    if validate_footer_bounds(&footer, file_len) {
+                    let candidate_footer_start = window_start + (end - TCI_FOOTER_SIZE) as u64;
+                    if validate_footer_bounds(&footer, candidate_footer_start) {
                         return Some(footer);
                     }
                 }
@@ -113,11 +160,18 @@ pub fn read_footer_from_path(exe_path: &Path) -> Option<TciFooter> {
     None
 }
 
-fn validate_footer_bounds(footer: &TciFooter, file_len: u64) -> bool {
-    footer.runtime_size <= file_len
-        && footer.ui_offset.saturating_add(footer.ui_size) <= file_len
-        && footer.payload_offset.saturating_add(footer.payload_size) <= file_len
-        && footer.manifest_offset.saturating_add(footer.manifest_size) <= file_len
+fn validate_footer_bounds(footer: &TciFooter, footer_start: u64) -> bool {
+    let total_sections = footer
+        .runtime_size
+        .saturating_add(footer.ui_size)
+        .saturating_add(footer.payload_size)
+        .saturating_add(footer.manifest_size);
+
+    total_sections <= footer_start
+        && footer.runtime_size <= footer_start
+        && footer.ui_offset.saturating_add(footer.ui_size) <= footer_start
+        && footer.payload_offset.saturating_add(footer.payload_size) <= footer_start
+        && footer.manifest_offset.saturating_add(footer.manifest_size) <= footer_start
 }
 
 pub fn read_footer_from_current_exe() -> Option<TciFooter> {
@@ -125,7 +179,7 @@ pub fn read_footer_from_current_exe() -> Option<TciFooter> {
     read_footer_from_path(&exe)
 }
 
-/// Reads the appended `AppManifest` from the given executable if a footer exists.
+/// Reads and (if V2 armored) decrypts the appended `AppManifest` from the given executable.
 pub fn read_appended_manifest(exe_path: &Path) -> Option<AppManifest> {
     let footer = read_footer_from_path(exe_path)?;
     if footer.manifest_size == 0 || footer.manifest_size > 10 * 1024 * 1024 {
@@ -135,10 +189,21 @@ pub fn read_appended_manifest(exe_path: &Path) -> Option<AppManifest> {
     file.seek(SeekFrom::Start(footer.manifest_offset)).ok()?;
     let mut buf = vec![0u8; footer.manifest_size as usize];
     file.read_exact(&mut buf).ok()?;
+
+    if footer.is_v2_armored {
+        transform_armor_bytes(
+            &mut buf,
+            &footer.payload_sha256,
+            &footer.ui_sha256,
+            footer.runtime_size,
+            ARMOR_SECTION_MANIFEST,
+        );
+    }
+
     serde_json::from_slice(&buf).ok()
 }
 
-/// Reads the appended `ui.zip` bytes from the current executable if present, verifying SHA-256.
+/// Reads and (if V2 armored) decrypts the appended `ui.zip` bytes, verifying SHA-256 against the plaintext UI archive.
 pub fn read_appended_ui_zip(exe_path: &Path) -> Result<Option<Vec<u8>>, String> {
     let footer = match read_footer_from_path(exe_path) {
         Some(f) if f.ui_size > 0 => f,
@@ -152,6 +217,16 @@ pub fn read_appended_ui_zip(exe_path: &Path) -> Result<Option<Vec<u8>>, String> 
         .map_err(|e| e.to_string())?;
     let mut buf = vec![0u8; footer.ui_size as usize];
     file.read_exact(&mut buf).map_err(|e| e.to_string())?;
+
+    if footer.is_v2_armored {
+        transform_armor_bytes(
+            &mut buf,
+            &footer.payload_sha256,
+            &footer.ui_sha256,
+            footer.runtime_size,
+            ARMOR_SECTION_UI,
+        );
+    }
 
     if footer.ui_sha256 != [0u8; 32] {
         let mut hasher = Sha256::new();
@@ -262,9 +337,8 @@ pub fn verify_section_sha256(reader: &mut SectionReader, expected: &[u8; 32]) ->
 }
 
 /// Writes `<install_dir>\uninstall.exe` WITHOUT copying the embedded payload.
-/// If the current executable uses the appended footer layout, it copies only:
-/// `[runtime_exe (runtime_size bytes)][ui.zip][manifest.json][footer (payload_size = 0)]`.
-/// This reduces `uninstall.exe` size from hundreds of megabytes to just the ~2.5 MB runtime + UI!
+/// If the source executable uses the V2 armored layout, UI & manifest sections are cleanly re-armored
+/// under `payload_sha256 = [0u8; 32]` so `uninstall.exe` retains full UI armoring without payload bytes.
 pub fn write_stripped_uninstaller(current_exe: &Path, uninstaller_dest: &Path) -> Result<(), String> {
     if let Some(footer) = read_footer_from_path(current_exe) {
         if footer.runtime_size > 0 {
@@ -277,26 +351,62 @@ pub fn write_stripped_uninstaller(current_exe: &Path, uninstaller_dest: &Path) -
             io::copy(&mut runtime_reader, &mut out).map_err(|e| e.to_string())?;
             let mut offset = footer.runtime_size;
 
-            // 2. Copy UI archive so uninstall.exe keeps the custom UI
+            let zero_payload_sha = [0u8; 32];
+
+            // 2. Copy (and re-armor if V2) UI archive so uninstall.exe keeps the custom UI
             let ui_offset = offset;
             if footer.ui_size > 0 {
                 src.seek(SeekFrom::Start(footer.ui_offset))
                     .map_err(|e| e.to_string())?;
-                let mut ui_reader = (&mut src).take(footer.ui_size);
-                io::copy(&mut ui_reader, &mut out).map_err(|e| e.to_string())?;
+                let mut ui_buf = vec![0u8; footer.ui_size as usize];
+                src.read_exact(&mut ui_buf).map_err(|e| e.to_string())?;
+                if footer.is_v2_armored {
+                    transform_armor_bytes(
+                        &mut ui_buf,
+                        &footer.payload_sha256,
+                        &footer.ui_sha256,
+                        footer.runtime_size,
+                        ARMOR_SECTION_UI,
+                    );
+                    transform_armor_bytes(
+                        &mut ui_buf,
+                        &zero_payload_sha,
+                        &footer.ui_sha256,
+                        footer.runtime_size,
+                        ARMOR_SECTION_UI,
+                    );
+                }
+                out.write_all(&ui_buf).map_err(|e| e.to_string())?;
                 offset += footer.ui_size;
             }
 
             // 3. Omit payload (payload_size = 0)
             let payload_offset = offset;
 
-            // 4. Copy manifest.json
+            // 4. Copy (and re-armor if V2) manifest.json
             let manifest_offset = offset;
             if footer.manifest_size > 0 {
                 src.seek(SeekFrom::Start(footer.manifest_offset))
                     .map_err(|e| e.to_string())?;
-                let mut manifest_reader = (&mut src).take(footer.manifest_size);
-                io::copy(&mut manifest_reader, &mut out).map_err(|e| e.to_string())?;
+                let mut manifest_buf = vec![0u8; footer.manifest_size as usize];
+                src.read_exact(&mut manifest_buf).map_err(|e| e.to_string())?;
+                if footer.is_v2_armored {
+                    transform_armor_bytes(
+                        &mut manifest_buf,
+                        &footer.payload_sha256,
+                        &footer.ui_sha256,
+                        footer.runtime_size,
+                        ARMOR_SECTION_MANIFEST,
+                    );
+                    transform_armor_bytes(
+                        &mut manifest_buf,
+                        &zero_payload_sha,
+                        &footer.ui_sha256,
+                        footer.runtime_size,
+                        ARMOR_SECTION_MANIFEST,
+                    );
+                }
+                out.write_all(&manifest_buf).map_err(|e| e.to_string())?;
             }
 
             // 5. Write updated footer with payload_size = 0
@@ -308,8 +418,9 @@ pub fn write_stripped_uninstaller(current_exe: &Path, uninstaller_dest: &Path) -
                 payload_size: 0,
                 manifest_offset,
                 manifest_size: footer.manifest_size,
-                payload_sha256: [0u8; 32],
+                payload_sha256: zero_payload_sha,
                 ui_sha256: footer.ui_sha256,
+                is_v2_armored: footer.is_v2_armored,
             };
             out.write_all(&new_footer.to_bytes())
                 .map_err(|e| e.to_string())?;

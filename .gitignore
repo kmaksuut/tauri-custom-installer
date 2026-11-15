@@ -39,6 +39,13 @@ examples/*/installer/bun.lockb
 .DS_Store
 Thumbs.db
 
+# Certificates & private keys (never commit private keys)
+certs/
+*.pfx
+*.p12
+*.key
+*.key.pem
+
 # Environment variables
 .env
 .env.local

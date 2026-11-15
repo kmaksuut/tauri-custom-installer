@@ -6,6 +6,7 @@ import { runProcess } from '../utils/exec';
 
 export interface DevOptions {
   native?: boolean;
+  tauri?: boolean;
 }
 
 export async function runDev(options: DevOptions = {}): Promise<void> {
@@ -21,7 +22,7 @@ export async function runDev(options: DevOptions = {}): Promise<void> {
 
   const pm = detectPackageManager(installerDir);
 
-  if (options.native) {
+  if (options.native || options.tauri) {
     console.log(
       pc.cyan(`\n🚀 Starting native installer window in ${pc.bold('DRY-RUN SANDBOX')} mode...`)
     );

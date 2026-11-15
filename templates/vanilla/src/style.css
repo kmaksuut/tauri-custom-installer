@@ -189,6 +189,19 @@ h2 {
   background-color: #34d399;
 }
 
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.status-ok {
+  color: #34d399;
+}
+
+.status-error {
+  color: #f87171;
+}
+
 .btn-danger {
   background-color: #e11d48;
   color: #ffffff;

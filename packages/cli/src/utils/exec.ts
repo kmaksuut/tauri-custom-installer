@@ -12,6 +12,18 @@ function escapeWinArg(arg: string): string {
   return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')}"`;
 }
 
+function redactSensitiveArgs(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    out.push(args[i]);
+    if (args[i].toLowerCase() === '/p' && i + 1 < args.length) {
+      out.push('***');
+      i++;
+    }
+  }
+  return out;
+}
+
 export function runProcess(
   command: string,
   args: string[],
@@ -43,7 +55,8 @@ export function runProcess(
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`Command '${command} ${args.join(' ')}' exited with code ${code}`));
+        const safeArgs = redactSensitiveArgs(args).join(' ');
+        reject(new Error(`Command '${command} ${safeArgs}' exited with code ${code}`));
       }
     });
 
@@ -67,4 +80,44 @@ export function tryExecOutput(
   } catch {
     return null;
   }
+}
+
+/**
+ * Splits a shell-style command line into executable and argument tokens,
+ * preserving spaces inside single or double quotes.
+ */
+export function splitCommandLine(commandLine: string): string[] {
+  const args: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+  let hasToken = false;
+
+  for (let i = 0; i < commandLine.length; i++) {
+    const ch = commandLine[i];
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        current += ch;
+      }
+      hasToken = true;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      hasToken = true;
+    } else if (/\s/.test(ch)) {
+      if (hasToken) {
+        args.push(current);
+        current = '';
+        hasToken = false;
+      }
+    } else {
+      current += ch;
+      hasToken = true;
+    }
+  }
+
+  if (hasToken) {
+    args.push(current);
+  }
+  return args;
 }

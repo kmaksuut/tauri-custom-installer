@@ -32,6 +32,12 @@ jobs:
           cd ../cli
           bun install
           bun run build
+          bun test
+          cd ../..
+      - name: Run Orchestrator Audit
+        run: |
+          node scripts/orchestrate.mjs audit
+          node scripts/orchestrate.mjs audit:ui
 
   build-templates:
     name: Template Frontend Builds (React, Futuristic 3D, Svelte, Vue, Vanilla)

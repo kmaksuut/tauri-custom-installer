@@ -53,6 +53,9 @@ function detectAppConfig(cwd = process.cwd()) {
     let signCommand;
     let certificateThumbprint;
     let timestampUrl;
+    let signPfxPath;
+    let signPasswordEnv;
+    let certificates = [];
     let createUpdaterArtifacts = false;
     let installMode = 'perUser';
     let startMenuFolder;
@@ -192,6 +195,13 @@ function detectAppConfig(cwd = process.cwd()) {
     }
     if (userConfig.sign?.timestampUrl)
         timestampUrl = userConfig.sign.timestampUrl;
+    if (userConfig.sign?.pfxPath)
+        signPfxPath = userConfig.sign.pfxPath;
+    if (userConfig.sign?.passwordEnv)
+        signPasswordEnv = userConfig.sign.passwordEnv;
+    if (Array.isArray(userConfig.certificates)) {
+        certificates = userConfig.certificates.filter((c) => Boolean(c && c.path));
+    }
     let licenseText;
     const licenseCandidate = userConfig.install?.license
         ? node_path_1.default.resolve(cwd, userConfig.install.license)
@@ -228,6 +238,7 @@ function detectAppConfig(cwd = process.cwd()) {
         licenseText,
         addToPath: userConfig.install?.addToPath ?? false,
         compression: userConfig.compression ?? 'zstd',
+        obfuscate: userConfig.obfuscate ?? true,
         uiRoot,
         uiOutDir,
         outputDir,
@@ -235,9 +246,12 @@ function detectAppConfig(cwd = process.cwd()) {
         externalBin,
         fileAssociations,
         urlSchemes,
+        certificates,
         signCommand,
         certificateThumbprint,
         timestampUrl,
+        signPfxPath,
+        signPasswordEnv,
         createUpdaterArtifacts,
     };
 }

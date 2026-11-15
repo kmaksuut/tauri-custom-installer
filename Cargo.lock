@@ -2545,7 +2545,7 @@ dependencies = [
 
 [[package]]
 name = "sample-tauri-app-installer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3214,7 +3214,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-custom-installer-template-react"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3225,7 +3225,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-custom-installer-template-svelte"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3236,7 +3236,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-custom-installer-template-vanilla"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3247,7 +3247,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-custom-installer-template-vue"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",

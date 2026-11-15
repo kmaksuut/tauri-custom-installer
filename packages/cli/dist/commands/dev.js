@@ -19,7 +19,7 @@ async function runDev(options = {}) {
         process.exit(1);
     }
     const pm = (0, config_1.detectPackageManager)(installerDir);
-    if (options.native) {
+    if (options.native || options.tauri) {
         console.log(picocolors_1.default.cyan(`\n🚀 Starting native installer window in ${picocolors_1.default.bold('DRY-RUN SANDBOX')} mode...`));
         console.log(picocolors_1.default.gray(`Registry writes are isolated under HKCU\\Software\\tci-sandbox. Changes in installer/src update live.\n`));
         await (0, exec_1.runProcess)('cargo', ['tauri', 'dev'], {

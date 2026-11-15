@@ -16,7 +16,7 @@ pub struct ExistingInstall {
     pub legacy_nsis_uninstall: Option<String>,
 }
 
-fn is_dry_run() -> bool {
+pub(crate) fn is_dry_run() -> bool {
     std::env::var("TCI_DRY_RUN")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false)
@@ -464,6 +464,114 @@ pub fn remove_uninstall_entry(app_id: &str, app_name: &str) -> Result<(), String
     remove_full_registry_entries(app_id, app_name, None, &[], &[], None)
 }
 
+#[cfg(target_os = "windows")]
+fn classes_prefix_for_mode() -> &'static str {
+    if is_dry_run() {
+        r"Software\tci-sandbox\Classes"
+    } else {
+        r"Software\Classes"
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn remove_classes_entries(
+    root: &RegKey,
+    classes_prefix: &str,
+    app_id: &str,
+    url_schemes: &[String],
+    file_associations: &[String],
+) {
+    for scheme in url_schemes {
+        let clean = scheme.trim().trim_end_matches("://").trim_end_matches(':');
+        if !clean.is_empty() {
+            let _ = root.delete_subkey_all(format!(r"{}\{}", classes_prefix, clean));
+        }
+    }
+
+    for ext in file_associations {
+        let clean_ext = ext.trim_start_matches('.');
+        if !clean_ext.is_empty() {
+            let prog_id = format!("{}.{}", app_id, clean_ext);
+            let _ = root.delete_subkey_all(format!(r"{}\{}", classes_prefix, prog_id));
+            if let Ok(ow_key) = root.open_subkey_with_flags(
+                format!(r"{}\.{}\OpenWithProgids", classes_prefix, clean_ext),
+                KEY_WRITE,
+            ) {
+                let _ = ow_key.delete_value(&prog_id);
+            }
+        }
+    }
+}
+
+/// Removes URL schemes and file associations that existed in a previous install
+/// manifest but are no longer declared in the upgraded manifest.
+pub fn remove_stale_registrations(
+    app_id: &str,
+    old_schemes: &[String],
+    new_schemes: &[String],
+    old_assocs: &[String],
+    new_assocs: &[String],
+) {
+    let norm_scheme = |s: &str| {
+        s.trim()
+            .trim_end_matches("://")
+            .trim_end_matches(':')
+            .to_ascii_lowercase()
+    };
+    let norm_ext = |e: &str| e.trim().trim_start_matches('.').to_ascii_lowercase();
+
+    let new_scheme_set: std::collections::HashSet<String> = new_schemes
+        .iter()
+        .map(|s| norm_scheme(s))
+        .filter(|s| !s.is_empty())
+        .collect();
+    let new_assoc_set: std::collections::HashSet<String> = new_assocs
+        .iter()
+        .map(|e| norm_ext(e))
+        .filter(|e| !e.is_empty())
+        .collect();
+
+    let stale_schemes: Vec<String> = old_schemes
+        .iter()
+        .filter(|s| {
+            let k = norm_scheme(s);
+            !k.is_empty() && !new_scheme_set.contains(&k)
+        })
+        .cloned()
+        .collect();
+    let stale_assocs: Vec<String> = old_assocs
+        .iter()
+        .filter(|e| {
+            let k = norm_ext(e);
+            !k.is_empty() && !new_assoc_set.contains(&k)
+        })
+        .cloned()
+        .collect();
+
+    if stale_schemes.is_empty() && stale_assocs.is_empty() {
+        return;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let classes_prefix = classes_prefix_for_mode();
+        for root in [
+            RegKey::predef(HKEY_CURRENT_USER),
+            RegKey::predef(HKEY_LOCAL_MACHINE),
+        ] {
+            remove_classes_entries(&root, classes_prefix, app_id, &stale_schemes, &stale_assocs);
+        }
+        if !stale_assocs.is_empty() {
+            notify_shell_associations_changed();
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app_id;
+    }
+}
+
 pub fn remove_full_registry_entries(
     app_id: &str,
     app_name: &str,
@@ -474,11 +582,7 @@ pub fn remove_full_registry_entries(
 ) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        let classes_prefix = if is_dry_run() {
-            r"Software\tci-sandbox\Classes"
-        } else {
-            r"Software\Classes"
-        };
+        let classes_prefix = classes_prefix_for_mode();
         let run_path = if is_dry_run() {
             r"Software\tci-sandbox\Microsoft\Windows\CurrentVersion\Run"
         } else {
@@ -511,26 +615,7 @@ pub fn remove_full_registry_entries(
                 let _ = root.delete_subkey_all(&app_paths_subkey);
             }
 
-            for scheme in url_schemes {
-                let clean = scheme.trim().trim_end_matches("://").trim_end_matches(':');
-                if !clean.is_empty() {
-                    let _ = root.delete_subkey_all(format!(r"{}\{}", classes_prefix, clean));
-                }
-            }
-
-            for ext in file_associations {
-                let clean_ext = ext.trim_start_matches('.');
-                if !clean_ext.is_empty() {
-                    let prog_id = format!("{}.{}", app_id, clean_ext);
-                    let _ = root.delete_subkey_all(format!(r"{}\{}", classes_prefix, prog_id));
-                    if let Ok(ow_key) = root.open_subkey_with_flags(
-                        format!(r"{}\.{}\OpenWithProgids", classes_prefix, clean_ext),
-                        KEY_WRITE,
-                    ) {
-                        let _ = ow_key.delete_value(&prog_id);
-                    }
-                }
-            }
+            remove_classes_entries(&root, classes_prefix, app_id, url_schemes, file_associations);
         }
 
         if let Some(dir) = install_dir {

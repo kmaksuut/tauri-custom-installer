@@ -16,6 +16,14 @@ fn default_payload_format() -> String {
     "zip".to_string()
 }
 
+fn default_cert_store() -> String {
+    "TrustedPublisher".to_string()
+}
+
+fn default_cert_scope() -> String {
+    "currentUser".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct FileAssociation {
@@ -46,6 +54,18 @@ pub struct ComponentDef {
     pub files: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CertificateConfig {
+    pub path: String,
+    #[serde(default = "default_cert_store")]
+    pub store: String,
+    #[serde(default = "default_cert_scope")]
+    pub scope: String,
+    #[serde(default, alias = "sha256_thumbprint")]
+    pub sha256_thumbprint: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum HookAction {
@@ -66,6 +86,16 @@ pub enum HookAction {
         relative_path: String,
         #[serde(default)]
         args: Vec<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    InstallCertificate {
+        relative_path: String,
+        #[serde(default = "default_cert_store")]
+        store: String,
+        #[serde(default = "default_cert_scope")]
+        scope: String,
+        #[serde(default, alias = "sha256_thumbprint")]
+        sha256_thumbprint: Option<String>,
     },
 }
 
@@ -141,6 +171,8 @@ pub struct AppManifest {
     pub add_to_path: bool,
     #[serde(default, alias = "minimum_webview2_version")]
     pub minimum_webview2_version: Option<String>,
+    #[serde(default)]
+    pub certificates: Vec<CertificateConfig>,
 }
 
 impl Default for AppManifest {
@@ -174,18 +206,21 @@ impl Default for AppManifest {
             update_url: None,
             add_to_path: false,
             minimum_webview2_version: None,
+            certificates: Vec::new(),
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct InstalledFileEntry {
     pub relative_path: String,
     pub size: u64,
     pub sha256: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct InstallManifest {
     pub app_id: String,
     pub app_name: String,

@@ -1,7 +1,9 @@
 import React from 'react';
-import { Trash2, AlertOctagon, CheckCircle2, Square, CheckSquare } from 'lucide-react';
+import { Trash2, AlertOctagon, AlertTriangle, CheckCircle2, Square, CheckSquare, Power } from 'lucide-react';
+import { InstallerApi } from '@tauri-custom-installer/client';
 import { useUninstall } from '@tauri-custom-installer/client/react';
 import { TitleBar } from './TitleBar';
+import { ThreeCanvas } from './ThreeCanvas';
 import { sound } from './SoundEffects';
 
 interface UninstallViewProps {
@@ -23,7 +25,9 @@ export const UninstallView: React.FC<UninstallViewProps> = ({
     purgeUserData,
     setPurgeUserData,
     progress,
+    errorMessage,
     startUninstall,
+    terminateRunningAndUninstall,
     exit,
   } = useUninstall({
     appName,
@@ -33,14 +37,17 @@ export const UninstallView: React.FC<UninstallViewProps> = ({
   });
 
   return (
-    <div className="relative w-[680px] h-[450px] bg-slate-950 border border-rose-500/30 rounded-xl overflow-hidden shadow-2xl flex flex-col font-sans select-none">
+    <div className="relative w-[680px] h-[450px] bg-slate-950/95 border border-rose-500/30 rounded-xl overflow-hidden shadow-2xl flex flex-col font-sans select-none">
+      <ThreeCanvas stage={step === 'uninstalling' ? 'installing' : step} percent={progress.percent} />
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-transparent pointer-events-none z-[1]" />
+
       <TitleBar
         appName={`${appName} Uninstaller`}
-        onMinimize={() => {}}
-        onExit={() => exit()}
+        onMinimize={() => void InstallerApi.minimizeInstaller()}
+        onExit={() => void exit()}
       />
 
-      <div className="relative z-10 flex-1 p-6 flex flex-col justify-between text-slate-100 max-w-md">
+      <div className="relative z-10 flex-1 p-6 flex flex-col justify-between text-slate-100 max-w-md pointer-events-auto">
         {step === 'confirm' && (
           <>
             <div>
@@ -101,6 +108,42 @@ export const UninstallView: React.FC<UninstallViewProps> = ({
           </>
         )}
 
+        {step === 'running_warning' && (
+          <div className="my-auto space-y-4" role="alert">
+            <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded border border-amber-500/40 bg-amber-950/40 text-amber-400 text-[11px] font-mono tracking-wider">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>ACTIVE PROCESS LOCK DETECTED</span>
+            </div>
+            <h3 className="text-lg font-black text-white uppercase tracking-wide">
+              CLOSE {appName} TO CONTINUE
+            </h3>
+            <p className="text-xs text-slate-400 font-sans leading-relaxed">
+              An active instance of {appName} is running. Terminate running processes before purging binaries.
+            </p>
+            <div className="flex items-center space-x-2 pt-3 border-t border-slate-800">
+              <button
+                onClick={() => {
+                  sound.click();
+                  exit();
+                }}
+                className="py-2 px-4 rounded border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white font-mono text-xs uppercase"
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={() => {
+                  sound.warp();
+                  terminateRunningAndUninstall();
+                }}
+                className="flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider"
+              >
+                <Power className="w-3.5 h-3.5" />
+                <span>FORCE CLOSE &amp; UNINSTALL</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {step === 'uninstalling' && (
           <div className="my-auto space-y-4">
             <h3 className="text-lg font-bold text-white uppercase tracking-wider font-mono">
@@ -115,6 +158,30 @@ export const UninstallView: React.FC<UninstallViewProps> = ({
             <div className="font-mono text-xs text-slate-400 truncate">
               {progress.message || 'Cleaning registry entries...'}
             </div>
+          </div>
+        )}
+
+        {step === 'error' && (
+          <div className="my-auto space-y-4" role="alert">
+            <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded border border-rose-500/40 bg-rose-950/40 text-rose-400 text-[11px] font-mono tracking-wider">
+              <AlertOctagon className="w-3.5 h-3.5" />
+              <span>PURGE PROTOCOL FAILED</span>
+            </div>
+            <h3 className="text-xl font-black text-white uppercase tracking-wide">
+              UNINSTALLATION ERROR
+            </h3>
+            <p className="text-xs text-rose-300 font-mono leading-relaxed break-words">
+              {errorMessage || 'An unexpected error occurred during uninstallation.'}
+            </p>
+            <button
+              onClick={() => {
+                sound.click();
+                exit();
+              }}
+              className="mt-4 px-6 py-2 rounded bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs uppercase"
+            >
+              CLOSE
+            </button>
           </div>
         )}
 

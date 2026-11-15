@@ -25,6 +25,7 @@
   let launchAfter = $state(true);
   let purgeUserData = $state(false);
   let errorMessage = $state('');
+  let runningPids = $state<number[]>([]);
   let validation = $state<PathValidation | null>(null);
   let progress = $state<InstallProgress>({
     stage: 'idle',
@@ -73,11 +74,19 @@
 
   async function startInstallFlow() {
     try {
+      const checked = await InstallerApi.validateInstallPath(installPath, requiredBytes);
+      validation = checked;
+      if (!checked.is_valid) {
+        errorMessage = checked.error_message || 'Selected installation path is invalid.';
+        return;
+      }
       const running = await InstallerApi.checkRunning(executableName, installPath);
       if (running.is_running) {
+        runningPids = running.process_ids ?? [];
         step = 'running_warning';
         return;
       }
+      runningPids = [];
       await performInstall();
     } catch (e) {
       errorMessage = e instanceof Error ? e.message : String(e);
@@ -87,7 +96,8 @@
 
   async function closeRunningAndInstall() {
     try {
-      await InstallerApi.killRunning([], executableName, installPath);
+      await InstallerApi.killRunning(runningPids, executableName, installPath);
+      runningPids = [];
       await performInstall();
     } catch (e) {
       errorMessage = e instanceof Error ? e.message : String(e);
@@ -129,6 +139,10 @@
 
   async function handleUninstall() {
     try {
+      const running = await InstallerApi.checkRunning(executableName, installPath);
+      if (running.is_running) {
+        await InstallerApi.killRunning(running.process_ids ?? [], executableName, installPath);
+      }
       await InstallerApi.startUninstallation(
         {
           app_id: appId,
@@ -148,7 +162,8 @@
 
   async function handleFinish() {
     if (launchAfter) {
-      await InstallerApi.launchInstalledApp(`${installPath}\\${executableName}`);
+      const cleanDir = installPath.replace(/[\\/]+$/, '');
+      await InstallerApi.launchInstalledApp(`${cleanDir}\\${executableName}`);
     }
     await InstallerApi.exitInstaller();
   }

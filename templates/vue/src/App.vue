@@ -25,6 +25,7 @@ const autoLaunch = ref(false);
 const launchAfter = ref(true);
 const purgeUserData = ref(false);
 const errorMessage = ref('');
+const runningPids = ref<number[]>([]);
 const validation = ref<PathValidation | null>(null);
 const progress = ref<InstallProgress>({
   stage: 'idle',
@@ -80,11 +81,19 @@ async function handleBrowse() {
 
 async function startInstallFlow() {
   try {
+    const checked = await InstallerApi.validateInstallPath(installPath.value, requiredBytes.value);
+    validation.value = checked;
+    if (!checked.is_valid) {
+      errorMessage.value = checked.error_message || 'Selected installation path is invalid.';
+      return;
+    }
     const running = await InstallerApi.checkRunning(executableName.value, installPath.value);
     if (running.is_running) {
+      runningPids.value = running.process_ids ?? [];
       step.value = 'running_warning';
       return;
     }
+    runningPids.value = [];
     await performInstall();
   } catch (e) {
     errorMessage.value = e instanceof Error ? e.message : String(e);
@@ -94,7 +103,8 @@ async function startInstallFlow() {
 
 async function closeRunningAndInstall() {
   try {
-    await InstallerApi.killRunning([], executableName.value, installPath.value);
+    await InstallerApi.killRunning(runningPids.value, executableName.value, installPath.value);
+    runningPids.value = [];
     await performInstall();
   } catch (e) {
     errorMessage.value = e instanceof Error ? e.message : String(e);
@@ -136,6 +146,14 @@ async function handleCancel() {
 
 async function handleUninstall() {
   try {
+    const running = await InstallerApi.checkRunning(executableName.value, installPath.value);
+    if (running.is_running) {
+      await InstallerApi.killRunning(
+        running.process_ids ?? [],
+        executableName.value,
+        installPath.value
+      );
+    }
     await InstallerApi.startUninstallation(
       {
         app_id: appId.value,
@@ -155,7 +173,8 @@ async function handleUninstall() {
 
 async function handleFinish() {
   if (launchAfter.value) {
-    await InstallerApi.launchInstalledApp(`${installPath.value}\\${executableName.value}`);
+    const cleanDir = installPath.value.replace(/[\\/]+$/, '');
+    await InstallerApi.launchInstalledApp(`${cleanDir}\\${executableName.value}`);
   }
   await InstallerApi.exitInstaller();
 }

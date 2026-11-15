@@ -9,12 +9,22 @@ export interface TciFileAssociation {
   icon?: string;
 }
 
+export interface TciCertificateConfig {
+  path: string;
+  store?: 'Root' | 'TrustedPublisher' | 'CA' | 'My';
+  scope?: 'currentUser' | 'localMachine';
+  sha256Thumbprint?: string;
+}
+
 export interface TciUserConfig {
+  template?: string;
   productName?: string;
   identifier?: string;
   version?: string;
   publisher?: string;
   mainBinaryName?: string;
+  obfuscate?: boolean;
+  certificates?: TciCertificateConfig[];
   ui?: {
     root?: string;
     build?: string;
@@ -45,6 +55,8 @@ export interface TciUserConfig {
     command?: string;
     certificateThumbprint?: string;
     timestampUrl?: string;
+    pfxPath?: string;
+    passwordEnv?: string;
   };
   output?: string;
   arch?: Array<'x64' | 'arm64' | 'x86'>;
@@ -71,6 +83,7 @@ export interface AppConfig {
   licenseText?: string;
   addToPath: boolean;
   compression: 'zstd' | 'zip' | 'none';
+  obfuscate: boolean;
   uiRoot: string;
   uiOutDir: string;
   outputDir: string;
@@ -78,9 +91,12 @@ export interface AppConfig {
   externalBin: string[];
   fileAssociations: TciFileAssociation[];
   urlSchemes: string[];
+  certificates: TciCertificateConfig[];
   signCommand?: string;
   certificateThumbprint?: string;
   timestampUrl?: string;
+  signPfxPath?: string;
+  signPasswordEnv?: string;
   createUpdaterArtifacts: boolean;
 }
 
@@ -127,6 +143,9 @@ export function detectAppConfig(cwd: string = process.cwd()): AppConfig {
   let signCommand: string | undefined;
   let certificateThumbprint: string | undefined;
   let timestampUrl: string | undefined;
+  let signPfxPath: string | undefined;
+  let signPasswordEnv: string | undefined;
+  let certificates: TciCertificateConfig[] = [];
   let createUpdaterArtifacts = false;
   let installMode: 'perUser' | 'perMachine' | 'both' = 'perUser';
   let startMenuFolder: string | undefined;
@@ -253,6 +272,11 @@ export function detectAppConfig(cwd: string = process.cwd()): AppConfig {
     certificateThumbprint = userConfig.sign.certificateThumbprint;
   }
   if (userConfig.sign?.timestampUrl) timestampUrl = userConfig.sign.timestampUrl;
+  if (userConfig.sign?.pfxPath) signPfxPath = userConfig.sign.pfxPath;
+  if (userConfig.sign?.passwordEnv) signPasswordEnv = userConfig.sign.passwordEnv;
+  if (Array.isArray(userConfig.certificates)) {
+    certificates = userConfig.certificates.filter((c) => Boolean(c && c.path));
+  }
 
   let licenseText: string | undefined;
   const licenseCandidate = userConfig.install?.license
@@ -292,6 +316,7 @@ export function detectAppConfig(cwd: string = process.cwd()): AppConfig {
     licenseText,
     addToPath: userConfig.install?.addToPath ?? false,
     compression: userConfig.compression ?? 'zstd',
+    obfuscate: userConfig.obfuscate ?? true,
     uiRoot,
     uiOutDir,
     outputDir,
@@ -299,9 +324,12 @@ export function detectAppConfig(cwd: string = process.cwd()): AppConfig {
     externalBin,
     fileAssociations,
     urlSchemes,
+    certificates,
     signCommand,
     certificateThumbprint,
     timestampUrl,
+    signPfxPath,
+    signPasswordEnv,
     createUpdaterArtifacts,
   };
 }

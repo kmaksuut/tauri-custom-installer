@@ -51,6 +51,16 @@ export const OptionsStep: React.FC<OptionsStepProps> = ({
 }) => {
   const reqMB = (requiredBytes / (1024 * 1024)).toFixed(1);
   const availGB = (validation.availableBytes / (1024 * 1024 * 1024)).toFixed(1);
+  const usagePercent =
+    validation.availableBytes > 0
+      ? Math.min(
+          100,
+          Math.max(
+            5,
+            Math.round((requiredBytes / (validation.availableBytes + requiredBytes)) * 100)
+          )
+        )
+      : 25;
 
   return (
     <div className="relative z-10 flex flex-col justify-between h-full p-6 text-slate-100 max-w-md pointer-events-auto">
@@ -113,7 +123,10 @@ export const OptionsStep: React.FC<OptionsStepProps> = ({
             <span className="text-white font-semibold">{reqMB} MB REQUIRED</span>
           </div>
           <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-cyan-400 rounded-full w-1/4 shadow-[0_0_8px_#22d3ee]" />
+            <div
+              className="h-full bg-cyan-400 rounded-full transition-all duration-300 shadow-[0_0_8px_#22d3ee]"
+              style={{ width: `${usagePercent}%` }}
+            />
           </div>
           <div className="flex justify-between text-[10px] text-slate-500">
             <span>DRIVE FREE: {availGB} GB</span>

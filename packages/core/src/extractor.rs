@@ -17,6 +17,19 @@ static EMBEDDED_MANIFEST_JSON: OnceLock<&'static str> = OnceLock::new();
 static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 const ZSTD_MAGIC: [u8; 4] = [0x28, 0xB5, 0x2F, 0xFD];
+const MAX_SINGLE_FILE_BYTES: u64 = 4 * 1024 * 1024 * 1024; // 4 GB per file
+const MAX_TOTAL_EXTRACTED_BYTES: u64 = 16 * 1024 * 1024 * 1024; // 16 GB total extracted payload
+
+#[inline]
+fn check_extraction_limits(file_size: u64, total_extracted: u64) -> Result<(), String> {
+    if file_size > MAX_SINGLE_FILE_BYTES {
+        return Err("Archive entry exceeds maximum safe single-file size limit (4 GB).".to_string());
+    }
+    if total_extracted > MAX_TOTAL_EXTRACTED_BYTES {
+        return Err("Archive exceeds maximum safe uncompressed size limit (16 GB).".to_string());
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone)]
 pub struct ExtractionReport {
@@ -353,6 +366,13 @@ where
             ensure_dir_tracked(parent, target_dir, created_dirs, manifest_dirs)?;
         }
 
+        if crate::uninstaller::is_reparse_point(&out_path) {
+            return Err(format!(
+                "Refusing to overwrite symlink or reparse point: {:?}",
+                out_path
+            ));
+        }
+
         backup_if_exists(&out_path, target_dir, backup_dir, backed_up_files, created_files)?;
 
         let mut outfile = File::create(&out_path)
@@ -371,11 +391,12 @@ where
             if n == 0 {
                 break;
             }
+            bytes_extracted = bytes_extracted.saturating_add(n as u64);
+            file_size += n as u64;
+            check_extraction_limits(file_size, bytes_extracted)?;
             io::Write::write_all(&mut outfile, &buffer[..n])
                 .map_err(|e| format!("Failed writing {}: {}", rel_str, e))?;
             hasher.update(&buffer[..n]);
-            file_size += n as u64;
-            bytes_extracted += n as u64;
 
             if last_emit.elapsed().as_millis() >= 33 {
                 last_emit = Instant::now();
@@ -459,6 +480,11 @@ where
             .by_index(i)
             .map_err(|e| format!("Failed to read entry {}: {}", i, e))?;
 
+        // Security: never extract symlinks
+        if file.is_symlink() {
+            continue;
+        }
+
         let raw_name = file.name().to_string();
         let rel_path = match sanitize_archive_entry_path(&raw_name) {
             Some(p) => p,
@@ -472,6 +498,13 @@ where
         } else {
             if let Some(parent) = out_path.parent() {
                 ensure_dir_tracked(parent, target_dir, created_dirs, manifest_dirs)?;
+            }
+
+            if crate::uninstaller::is_reparse_point(&out_path) {
+                return Err(format!(
+                    "Refusing to overwrite symlink or reparse point: {:?}",
+                    out_path
+                ));
             }
 
             backup_if_exists(&out_path, target_dir, backup_dir, backed_up_files, created_files)?;
@@ -493,12 +526,13 @@ where
                 if n == 0 {
                     break;
                 }
+                bytes_extracted = bytes_extracted.saturating_add(n as u64);
+                file_size += n as u64;
+                check_extraction_limits(file_size, bytes_extracted)?;
                 io::Write::write_all(&mut outfile, &buffer[..n])
                     .map_err(|e| format!("Failed writing file {}: {}", raw_name, e))?;
 
                 hasher.update(&buffer[..n]);
-                file_size += n as u64;
-                bytes_extracted += n as u64;
 
                 let is_last_chunk = file_size == file.size();
                 if is_last_chunk || last_emit.elapsed().as_millis() >= 33 {
@@ -561,7 +595,14 @@ fn ensure_dir_tracked(
         }
     }
     for d in stack.into_iter().rev() {
-        if !d.exists() {
+        if d.exists() {
+            if crate::uninstaller::is_reparse_point(&d) {
+                return Err(format!(
+                    "Refusing to traverse symlink or reparse point directory: {:?}",
+                    d
+                ));
+            }
+        } else {
             fs::create_dir_all(&d)
                 .map_err(|e| format!("Failed to create directory {:?}: {}", d, e))?;
             created_dirs.push(d.clone());
@@ -608,8 +649,8 @@ fn to_hex(bytes: &[u8]) -> String {
     s
 }
 
-/// Removes stale files left over from a previous version after an in-place upgrade,
-/// using the previous `.tci\manifest.json`.
+/// Removes stale files and empty stale directories left over from a previous version
+/// after an in-place upgrade, using the previous `.tci\manifest.json`.
 pub fn cleanup_stale_upgrade_files(
     target_dir: &Path,
     old_manifest: &InstallManifest,
@@ -625,9 +666,24 @@ pub fn cleanup_stale_upgrade_files(
         if !new_set.contains(&key) {
             if let Some(clean_rel) = sanitize_archive_entry_path(&old_file.relative_path) {
                 let stale_path = target_dir.join(clean_rel);
-                if stale_path.exists() && stale_path.is_file() {
+                if stale_path.exists()
+                    && !crate::uninstaller::is_reparse_point(&stale_path)
+                    && stale_path.is_file()
+                {
                     let _ = fs::remove_file(stale_path);
                 }
+            }
+        }
+    }
+
+    // Prune empty stale directories deepest-first (`fs::remove_dir` never deletes non-empty dirs)
+    let mut old_dirs = old_manifest.directories.clone();
+    old_dirs.sort_by_key(|b| std::cmp::Reverse(b.len()));
+    for old_dir in old_dirs {
+        if let Some(clean_rel) = sanitize_archive_entry_path(&old_dir) {
+            let dir_path = target_dir.join(clean_rel);
+            if dir_path.exists() && !crate::uninstaller::is_reparse_point(&dir_path) {
+                let _ = fs::remove_dir(&dir_path);
             }
         }
     }

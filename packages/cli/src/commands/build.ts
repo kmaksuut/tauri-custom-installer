@@ -3,8 +3,11 @@ import path from 'node:path';
 import pc from 'picocolors';
 import { createPayloadArchiveDetailed, createZipArchive } from '../utils/archiver';
 import { type AppConfig, detectAppConfig, detectPackageManager } from '../utils/config';
-import { runProcess, tryExecOutput } from '../utils/exec';
+import { runProcess, splitCommandLine, tryExecOutput } from '../utils/exec';
+import { obfuscateUiBundleDirectory } from '../utils/obfuscator';
 import { buildSfxExecutable } from '../utils/sfx';
+import { findSignToolExecutable, parseCertificateFile } from './cert';
+import { getCliRootDir } from './init';
 
 export interface BuildOptions {
   release?: boolean;
@@ -18,6 +21,13 @@ export interface BuildOptions {
 interface StagedFileInfo {
   relPath: string;
   size: number;
+}
+
+interface StagedCertificateInfo {
+  path: string;
+  store: string;
+  scope: string;
+  sha256Thumbprint: string;
 }
 
 function resolveCargoTargetDir(cargoDir: string): string {
@@ -63,13 +73,18 @@ function stageApplicationPayload(
   releaseDir: string | null,
   stageDir: string,
   targetTriple: string
-): { totalUncompressedBytes: number; stagedFiles: StagedFileInfo[] } {
+): {
+  totalUncompressedBytes: number;
+  stagedFiles: StagedFileInfo[];
+  stagedCertificates: StagedCertificateInfo[];
+} {
   if (fs.existsSync(stageDir)) {
     fs.rmSync(stageDir, { recursive: true, force: true });
   }
   fs.mkdirSync(stageDir, { recursive: true });
 
   const stagedFiles: StagedFileInfo[] = [];
+  const stagedCertificates: StagedCertificateInfo[] = [];
   let totalUncompressedBytes = 0;
   let mainBinaryStaged = false;
 
@@ -158,7 +173,32 @@ function stageApplicationPayload(
     }
   }
 
-  // 5. If running in --skip-app-build demo mode and no binary exists yet, create a valid demo stub
+  // 5. Validate and stage configured code-signing/trust certificates into `.tci/certs/`
+  for (const [idx, cert] of (appConfig.certificates || []).entries()) {
+    const srcCertPath = path.resolve(cwd, cert.path);
+    if (!fs.existsSync(srcCertPath) || !fs.statSync(srcCertPath).isFile()) {
+      throw new Error(`Configured certificate file not found: ${cert.path}`);
+    }
+    const parsedCert = parseCertificateFile(srcCertPath);
+    const configuredThumbprint = cert.sha256Thumbprint
+      ? cert.sha256Thumbprint.replace(/[\s:]/g, '').toLowerCase()
+      : '';
+    if (configuredThumbprint && configuredThumbprint !== parsedCert.sha256Thumbprint) {
+      throw new Error(
+        `Certificate SHA-256 thumbprint mismatch for ${cert.path}: config=${configuredThumbprint}, actual=${parsedCert.sha256Thumbprint}`
+      );
+    }
+    const relCertDest = `.tci/certs/${idx}-${path.basename(srcCertPath)}`;
+    copyIntoStage(srcCertPath, relCertDest);
+    stagedCertificates.push({
+      path: relCertDest,
+      store: cert.store || 'TrustedPublisher',
+      scope: cert.scope || 'currentUser',
+      sha256Thumbprint: configuredThumbprint || parsedCert.sha256Thumbprint,
+    });
+  }
+
+  // 6. If running in --skip-app-build demo mode and no binary exists yet, create a valid demo stub
   if (!mainBinaryStaged) {
     const stubExe = path.join(stageDir, appConfig.executableName);
     const stubContent = Buffer.alloc(64 * 1024, 'MZ_TAURI_APPLICATION_PAYLOAD_DEMO');
@@ -167,7 +207,7 @@ function stageApplicationPayload(
     stagedFiles.push({ relPath: appConfig.executableName, size: stubContent.length });
   }
 
-  return { totalUncompressedBytes, stagedFiles };
+  return { totalUncompressedBytes, stagedFiles, stagedCertificates };
 }
 
 function copyDirIntoStage(
@@ -246,7 +286,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   }
 
   const stageDir = path.join(installerDir, '.payload_staging');
-  const { totalUncompressedBytes, stagedFiles } = stageApplicationPayload(
+  const { totalUncompressedBytes, stagedFiles, stagedCertificates } = stageApplicationPayload(
     cwd,
     appConfig,
     releaseDir,
@@ -307,6 +347,15 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   await runProcess(installerPm, ['run', 'build'], { cwd: installerDir });
 
   const uiDistDir = path.resolve(cwd, appConfig.uiOutDir || path.join(installerDir, 'dist'));
+  const shouldArmorAndObfuscate = isRelease && appConfig.obfuscate !== false;
+  if (shouldArmorAndObfuscate && fs.existsSync(uiDistDir)) {
+    const obf = obfuscateUiBundleDirectory(uiDistDir);
+    console.log(
+      pc.green(
+        `✔ Release UI obfuscated (${obf.filesProcessed} files, ${obf.stringsEncoded} strings encoded, ${obf.sourcemapsRemoved} source maps stripped)`
+      )
+    );
+  }
   const uiZipPath = path.join(payloadDir, 'ui.zip');
   let uiZipBytes = 0;
   if (fs.existsSync(uiDistDir)) {
@@ -355,6 +404,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     fileAssociations: appConfig.fileAssociations,
     components: [],
     addToPath: appConfig.addToPath,
+    certificates: stagedCertificates,
   };
 
   const sfxResult = buildSfxExecutable({
@@ -363,6 +413,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     payloadPath: payloadArchivePath,
     manifest: embeddedManifest,
     outputExePath: finalSetupPath,
+    armor: shouldArmorAndObfuscate,
   });
 
   if (compatSetupPath !== finalSetupPath) {
@@ -370,9 +421,12 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   }
 
   // Optional Code Signing
-  let signStatus = 'Unsigned (no signCommand configured)';
-  if (options.sign !== false && (appConfig.signCommand || appConfig.certificateThumbprint)) {
-    signStatus = await signExecutableIfConfigured(finalSetupPath, appConfig);
+  let signStatus = 'Unsigned (no signCommand, PFX, or thumbprint configured)';
+  if (
+    options.sign !== false &&
+    (appConfig.signCommand || appConfig.certificateThumbprint || appConfig.signPfxPath)
+  ) {
+    signStatus = await signExecutableIfConfigured(cwd, finalSetupPath, appConfig);
     if (compatSetupPath !== finalSetupPath) {
       fs.copyFileSync(finalSetupPath, compatSetupPath);
     }
@@ -423,6 +477,14 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     `${pc.cyan('│')} ${pc.bold('UI Bundle Size:')}   ${(sfxResult.uiBytes / 1024).toFixed(1)} KB`
   );
   console.log(
+    `${pc.cyan('│')} ${pc.bold('SFX Protection:')}   ${sfxResult.isV2Armored ? 'V2 SHA-256 CTR + UI Obfuscation' : 'V1 Plaintext'}`
+  );
+  if (stagedCertificates.length > 0) {
+    console.log(
+      `${pc.cyan('│')} ${pc.bold('Certificates:')}     ${stagedCertificates.length} thumbprint-pinned`
+    );
+  }
+  console.log(
     `${pc.cyan('│')} ${pc.bold('Setup .exe Size:')}  ${(sfxResult.totalExeBytes / (1024 * 1024)).toFixed(2)} MB`
   );
   console.log(`${pc.cyan('│')} ${pc.bold('Code Signing:')}     ${signStatus}`);
@@ -461,8 +523,10 @@ async function buildMainTauriApp(
       const conf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
       const beforeBuild = conf.build?.beforeBuildCommand;
       if (typeof beforeBuild === 'string' && beforeBuild.trim().length > 0) {
-        const parts = beforeBuild.trim().split(/\s+/);
-        await runProcess(parts[0], parts.slice(1), { cwd });
+        const parts = splitCommandLine(beforeBuild.trim());
+        if (parts.length > 0) {
+          await runProcess(parts[0], parts.slice(1), { cwd });
+        }
       }
     } catch {
       // ignore
@@ -492,7 +556,7 @@ async function resolveOrBuildRuntimeExecutable(
   }
 
   // 2. Packaged prebuilt runtime inside CLI vendor folder
-  const vendorRuntime = path.resolve(__dirname, '..', 'vendor', 'runtime', 'tci-runtime.exe');
+  const vendorRuntime = path.join(getCliRootDir(), 'vendor', 'runtime', 'tci-runtime.exe');
   if (fs.existsSync(vendorRuntime)) {
     return vendorRuntime;
   }
@@ -560,17 +624,46 @@ async function resolveOrBuildRuntimeExecutable(
 }
 
 async function signExecutableIfConfigured(
+  cwd: string,
   exePath: string,
   appConfig: AppConfig
 ): Promise<string> {
   try {
     if (appConfig.signCommand) {
-      const cmdStr = appConfig.signCommand.includes('%1')
-        ? appConfig.signCommand.replace(/%1/g, `"${exePath}"`)
-        : `${appConfig.signCommand} "${exePath}"`;
-      const parts = cmdStr.split(/\s+/);
-      await runProcess(parts[0], parts.slice(1));
-      return 'Signed (custom signCommand)';
+      const tokens = splitCommandLine(appConfig.signCommand);
+      if (tokens.length > 0) {
+        const hasPlaceholder = tokens.some((t) => t.includes('%1'));
+        const finalTokens = hasPlaceholder
+          ? tokens.map((t) => t.replace(/%1/g, exePath))
+          : [...tokens, exePath];
+        await runProcess(finalTokens[0], finalTokens.slice(1));
+        return 'Signed (custom signCommand)';
+      }
+    }
+    const signTool = findSignToolExecutable() || 'signtool';
+    if (appConfig.signPfxPath) {
+      const resolvedPfx = path.resolve(cwd, appConfig.signPfxPath);
+      if (!fs.existsSync(resolvedPfx)) {
+        return `Signing failed (PFX file not found: ${resolvedPfx})`;
+      }
+      const args = ['sign', '/f', resolvedPfx];
+      if (appConfig.signPasswordEnv) {
+        const password = process.env[appConfig.signPasswordEnv];
+        if (!password) {
+          return `Signing failed (Environment variable '${appConfig.signPasswordEnv}' is not set)`;
+        }
+        args.push('/p', password);
+      }
+      args.push(
+        '/fd',
+        'SHA256',
+        ...(appConfig.timestampUrl
+          ? ['/tr', appConfig.timestampUrl, '/td', 'SHA256']
+          : []),
+        exePath
+      );
+      await runProcess(signTool, args);
+      return `Signed (PFX ${path.basename(resolvedPfx)})`;
     }
     if (appConfig.certificateThumbprint) {
       const args = [
@@ -584,7 +677,7 @@ async function signExecutableIfConfigured(
           : []),
         exePath,
       ];
-      await runProcess('signtool', args);
+      await runProcess(signTool, args);
       return `Signed (thumbprint ${appConfig.certificateThumbprint.slice(0, 8)}...)`;
     }
   } catch (err: unknown) {

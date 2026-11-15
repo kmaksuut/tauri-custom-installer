@@ -1,0 +1,23 @@
+---
+description: Architecture, security invariants, template rules, and orchestrator workflow for tauri-custom-installer
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Tauri Custom Installer Rules
+
+1. **Follow `AGENTS.md`**: Keep architecture, Single-File SFX boundaries, and template parity aligned with root `AGENTS.md`.
+2. **Rust Core (`packages/core/src/*.rs`)**:
+   - Read privileged app metadata from `get_authoritative_manifest()`, not frontend IPC parameters.
+   - Use Win32 COM (`shortcuts.rs`) and `winreg` (`registry.rs`); never shell out to `powershell`, `cmd.exe`, or `wscript`.
+   - Maintain backward compatibility (`#[serde(default)]`) on `InstallManifest` and `InstalledFileEntry` in `models.rs`.
+   - Guard archive extraction (`extractor.rs`), uninstaller cleanup (`uninstaller.rs`), and declarative hooks (`commands.rs`) with `sanitize_archive_entry_path` and `is_reparse_point`.
+3. **TypeScript CLI & SDK (`packages/cli`, `packages/client`)**:
+   - Use `getCliRootDir()` in `packages/cli/src/commands/init.ts` for packaged assets (`templates/`, `vendor/`).
+   - Use `splitCommandLine()` in `packages/cli/src/utils/exec.ts` instead of `.split(/\s+/)` when parsing user commands.
+   - Preserve backwards compatibility on `tci.config.json` and support `tci upgrade`, `tci clean`, and `tci check`.
+4. **UI Templates (`templates/*`)**:
+   - Use `@tauri-custom-installer/client` (`InstallerApi` / `createInstallerStore`).
+   - Always validate paths via `validateInstallPath`, check running processes via `checkRunning`, and display clear errors.
+5. **Continuous Verification**:
+   - After edits, run `node scripts/orchestrate.mjs all` (or `npm run orchestrate`) to verify cleanliness, manifest sync, audit checks, builds, tests, and `npm pack --dry-run` hygiene.

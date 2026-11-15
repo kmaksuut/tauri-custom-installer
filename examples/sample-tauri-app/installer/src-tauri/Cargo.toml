@@ -1,6 +1,6 @@
 [package]
 name = "sample-tauri-app-installer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Custom installer launcher built with Tauri v2 and React"
 edition = "2021"
 

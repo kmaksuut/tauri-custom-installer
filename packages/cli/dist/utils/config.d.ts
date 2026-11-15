@@ -5,12 +5,21 @@ export interface TciFileAssociation {
     mimeType?: string;
     icon?: string;
 }
+export interface TciCertificateConfig {
+    path: string;
+    store?: 'Root' | 'TrustedPublisher' | 'CA' | 'My';
+    scope?: 'currentUser' | 'localMachine';
+    sha256Thumbprint?: string;
+}
 export interface TciUserConfig {
+    template?: string;
     productName?: string;
     identifier?: string;
     version?: string;
     publisher?: string;
     mainBinaryName?: string;
+    obfuscate?: boolean;
+    certificates?: TciCertificateConfig[];
     ui?: {
         root?: string;
         build?: string;
@@ -41,6 +50,8 @@ export interface TciUserConfig {
         command?: string;
         certificateThumbprint?: string;
         timestampUrl?: string;
+        pfxPath?: string;
+        passwordEnv?: string;
     };
     output?: string;
     arch?: Array<'x64' | 'arm64' | 'x86'>;
@@ -63,6 +74,7 @@ export interface AppConfig {
     licenseText?: string;
     addToPath: boolean;
     compression: 'zstd' | 'zip' | 'none';
+    obfuscate: boolean;
     uiRoot: string;
     uiOutDir: string;
     outputDir: string;
@@ -70,9 +82,12 @@ export interface AppConfig {
     externalBin: string[];
     fileAssociations: TciFileAssociation[];
     urlSchemes: string[];
+    certificates: TciCertificateConfig[];
     signCommand?: string;
     certificateThumbprint?: string;
     timestampUrl?: string;
+    signPfxPath?: string;
+    signPasswordEnv?: string;
     createUpdaterArtifacts: boolean;
 }
 export type PackageManager = 'bun' | 'npm' | 'pnpm' | 'yarn';

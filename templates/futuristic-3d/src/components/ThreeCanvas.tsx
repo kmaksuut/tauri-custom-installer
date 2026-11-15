@@ -23,12 +23,17 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ stage, percent }) => {
     scene.fog = new THREE.FogExp2(0x050814, 0.035);
 
     const width = container.clientWidth || 680;
-    const height = container.clientHeight || 450;
+    const height = Math.max(container.clientHeight || 450, 1);
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 0.4, 5.2);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch {
+      return;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
@@ -243,8 +248,8 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({ stage, percent }) => {
     // Resize Handler
     const handleResize = () => {
       if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
+      const w = Math.max(container.clientWidth, 1);
+      const h = Math.max(container.clientHeight, 1);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);

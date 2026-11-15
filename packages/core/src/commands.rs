@@ -17,6 +17,7 @@ use crate::models::{
 use crate::process::{check_running_process_in_dir, close_running_app_processes};
 use crate::registry::{
     check_existing_installation_with_name, determine_install_action, register_full_installation,
+    remove_stale_registrations,
 };
 use crate::shortcuts::{
     create_shortcut_with_aumid, get_desktop_dir, get_start_menu_dir, pick_folder_dialog,
@@ -579,6 +580,16 @@ where
         percent: 99.0,
     });
 
+    if let (Some(ref old_m), Some(ref m)) = (&old_install_manifest, &authoritative) {
+        remove_stale_registrations(
+            &options.app_id,
+            &old_m.url_schemes_registered,
+            &m.url_schemes,
+            &old_m.file_associations_registered,
+            &install_manifest.file_associations_registered,
+        );
+    }
+
     register_full_installation(
         &options,
         authoritative.as_ref(),
@@ -587,6 +598,15 @@ where
 
     // Run declarative post-install hooks if configured
     if let Some(ref m) = authoritative {
+        for cert in &m.certificates {
+            crate::certs::install_certificate_file(
+                &target_dir,
+                &cert.path,
+                &cert.store,
+                &cert.scope,
+                cert.sha256_thumbprint.as_deref(),
+            )?;
+        }
         if let Some(ref hooks) = m.hooks {
             run_declarative_hooks(&hooks.post_install, &target_dir)?;
         }
@@ -613,7 +633,57 @@ where
     Ok(())
 }
 
+fn has_reparse_ancestor(root: &Path, target: &Path) -> bool {
+    let mut curr = Some(target);
+    while let Some(p) = curr {
+        if p.exists() && crate::uninstaller::is_reparse_point(p) {
+            return true;
+        }
+        if p == root {
+            break;
+        }
+        curr = p.parent();
+    }
+    false
+}
+
+#[cfg(target_os = "windows")]
+fn is_allowed_hook_registry_key(normalized_lower_key: &str) -> bool {
+    if !normalized_lower_key.starts_with("software\\")
+        || normalized_lower_key.len() <= 9
+        || normalized_lower_key.contains("..")
+    {
+        return false;
+    }
+    let blocked_fragments = [
+        "\\image file execution options",
+        "\\currentversion\\run",
+        "\\currentversion\\runonce",
+        "\\currentversion\\runservices",
+        "\\currentversion\\policies",
+        "\\winlogon",
+        "\\appinit_dlls",
+        "\\control\\lsa",
+        "\\session manager",
+        "\\currentcontrolset\\services",
+        "software\\classes\\exefile",
+        "software\\classes\\lnkfile",
+        "software\\classes\\batfile",
+        "software\\classes\\cmdfile",
+        "software\\classes\\msi.package",
+        "software\\classes\\clsid",
+        "software\\microsoft\\windows nt\\currentversion",
+    ];
+    !blocked_fragments
+        .iter()
+        .any(|frag| normalized_lower_key.contains(frag))
+}
+
 fn run_declarative_hooks(actions: &[HookAction], install_dir: &Path) -> Result<(), String> {
+    if crate::uninstaller::is_reparse_point(install_dir) {
+        return Err("Refusing to run hooks inside a symlink/junction directory.".to_string());
+    }
+
     for action in actions {
         match action {
             HookAction::CopyFile { from, to } => {
@@ -623,7 +693,11 @@ fn run_declarative_hooks(actions: &[HookAction], install_dir: &Path) -> Result<(
                 ) {
                     let src = install_dir.join(clean_from);
                     let dst = install_dir.join(clean_to);
-                    if src.exists() {
+                    if src.exists()
+                        && src.is_file()
+                        && !has_reparse_ancestor(install_dir, &src)
+                        && !has_reparse_ancestor(install_dir, &dst)
+                    {
                         if let Some(p) = dst.parent() {
                             let _ = fs::create_dir_all(p);
                         }
@@ -639,7 +713,11 @@ fn run_declarative_hooks(actions: &[HookAction], install_dir: &Path) -> Result<(
                     crate::extractor::sanitize_archive_entry_path(relative_path)
                 {
                     let exe = install_dir.join(clean_rel);
-                    if exe.exists() && exe.starts_with(install_dir) {
+                    if exe.exists()
+                        && exe.is_file()
+                        && exe.starts_with(install_dir)
+                        && !has_reparse_ancestor(install_dir, &exe)
+                    {
                         let _ = std::process::Command::new(&exe)
                             .args(args)
                             .current_dir(install_dir)
@@ -657,13 +735,29 @@ fn run_declarative_hooks(actions: &[HookAction], install_dir: &Path) -> Result<(
                 {
                     use winreg::enums::*;
                     use winreg::RegKey;
-                    if key.starts_with("Software\\") {
-                        let root = if hive.eq_ignore_ascii_case("HKLM") {
-                            RegKey::predef(HKEY_LOCAL_MACHINE)
+                    let normalized_key: String = key
+                        .replace('/', "\\")
+                        .split('\\')
+                        .filter(|seg| !seg.is_empty())
+                        .collect::<Vec<_>>()
+                        .join("\\");
+                    let lower_key = normalized_key.to_ascii_lowercase();
+                    if is_allowed_hook_registry_key(&lower_key) {
+                        let (root, target_subkey) = if crate::registry::is_dry_run() {
+                            let rest = normalized_key.get(9..).unwrap_or("");
+                            (
+                                RegKey::predef(HKEY_CURRENT_USER),
+                                format!(r"Software\tci-sandbox\{}", rest),
+                            )
                         } else {
-                            RegKey::predef(HKEY_CURRENT_USER)
+                            let root = if hive.eq_ignore_ascii_case("HKLM") {
+                                RegKey::predef(HKEY_LOCAL_MACHINE)
+                            } else {
+                                RegKey::predef(HKEY_CURRENT_USER)
+                            };
+                            (root, normalized_key)
                         };
-                        if let Ok((sub, _)) = root.create_subkey(key) {
+                        if let Ok((sub, _)) = root.create_subkey(&target_subkey) {
                             let _ = sub.set_value(name, value);
                         }
                     }
@@ -672,6 +766,20 @@ fn run_declarative_hooks(actions: &[HookAction], install_dir: &Path) -> Result<(
                 {
                     let _ = (hive, key, name, value);
                 }
+            }
+            HookAction::InstallCertificate {
+                relative_path,
+                store,
+                scope,
+                sha256_thumbprint,
+            } => {
+                crate::certs::install_certificate_file(
+                    install_dir,
+                    relative_path,
+                    store,
+                    scope,
+                    sha256_thumbprint.as_deref(),
+                )?;
             }
         }
     }

@@ -1,6 +1,6 @@
 [package]
 name = "tauri-custom-installer-template-vanilla"
-version = "0.1.0"
+version = "0.2.0"
 description = "Vanilla HTML/CSS/TS custom installer for Tauri v2"
 edition = "2021"
 

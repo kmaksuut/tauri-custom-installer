@@ -1,303 +1,149 @@
-# Tauri Custom Installer (`tauri-custom-installer`)
+# Tauri Custom Installer (`tci`)
 
-<div align="center">
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](./LICENSE)
-[![Tauri v2](https://img.shields.io/badge/Built%20with%20Tauri%20v2-for%20Tauri%20v2-blue.svg)](https://v2.tauri.app/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-3178C6.svg)](https://www.typescriptlang.org/)
-[![Rust](https://img.shields.io/badge/Rust-1.80+-DEA584.svg)](https://www.rust-lang.org/)
-
-</div>
+Build fast, customizable, web-powered **Windows Self-Extracting (SFX) installers** for **Tauri v2** applications—without NSIS, Inno Setup, or WebView bootstrapper bloat.
 
 > [!NOTE]
-> **100% AI-Developed:** This entire project, codebase, and architecture was authored and engineered completely by Artificial Intelligence, powered by **Gemini 3.8 Flash** and **Gemini 4 Argon**.
-
-<div align="center">
-
-**Build sleek, modern, web-based custom installers for Tauri v2 using Tauri v2 itself.**  
-Replace outdated 1990s Win32 NSIS wizards with a frameless, animated setup experience written in **React, Svelte 5, Vue 3, Solid, or Vanilla HTML/CSS/TS**—with full NSIS/MSI feature parity, `tar.zst` streaming, and manifest-based safe uninstallation.
-
-<br/>
+> `tauri-custom-installer` replaces legacy script-based installers with a compact Tauri v2 SFX runtime stub (`tci-runtime.exe`), streaming `.tar.zst` / `.zip` decompression, native Win32 OS integration (zero PowerShell/shell-outs), release UI obfuscation, SHA-256 CTR SFX V2 armoring, and browser-based hot-reload previewing.
 
 <p align="center">
-  <img src="./assets/tci1.png" alt="Tauri Custom Installer - Welcome Screen" width="49%" />
-  <img src="./assets/tci2.png" alt="Tauri Custom Installer - Options and Progress" width="49%" />
+  <img src="./assets/tci1.png" alt="Tauri Custom Installer Welcome Screen" width="48%" />
+  &nbsp;
+  <img src="./assets/tci2.png" alt="Tauri Custom Installer Progress View" width="48%" />
 </p>
 
-</div>
+## Why Tauri Custom Installer?
 
----
+- **Custom Web UI**: Design your installer in **React**, **Three.js 3D**, **Svelte 5**, **Vue 3**, or **Vanilla TypeScript** with hot-reload browser simulation (`?scenario=success|app_running|already_installed_upgrade|insufficient_space|uninstall`).
+- **Zero Shell-Out Windows Native Core**: Uses native Win32 COM (`IShellLinkW`, `IFileOpenDialog`), native CryptoAPI (`CertOpenStore`, `CertAddEncodedCertificateToStore`), Windows Registry ARP entries, and Win32 process detection without spawning PowerShell or `cmd.exe`.
+- **Single-File SFX V2 Security Armor**: Release builds apply UI JS obfuscation (`obfuscator.ts`) and encrypt the appended `ui.zip` + authoritative `manifest.json` using SHA-256 CTR (`TCI_SFX_V2`) with Authenticode trailer coexistence.
+- **Certificate Pinning & Signing**: Supports dev certificate generation (`tci cert`), PFX / thumbprint / custom `signTool` signing, RFC 3161 timestamps, and SHA-256 thumbprint-pinned root/publisher cert deployment.
+- **Built-in Repository Orchestrator**: Permanent health & security automation (`npm run orchestrate`) across versions, audit checks, tests, and npm tarball hygiene.
 
-## ⚡ Quick Start (3 Steps)
+## Pick Your UI Template
 
-### 1. Add to Your Tauri v2 Project
+Run `init` inside your Tauri v2 project and select the template that matches your frontend stack:
 
-Inside your main Tauri project root (where `package.json` and `src-tauri/` reside):
+| Template | Alias(es) | Highlights | Guide |
+| --- | --- | --- | --- |
+| `react` *(default)* | — | React 19, Tailwind CSS, Lucide Icons, `useInstaller` & `useUninstall` hooks | [React README](./templates/react/README.md) |
+| `futuristic-3d` | `3d`, `gaming`, `gaming-3d`, `three`, `threejs`, `futuristic` | Interactive Three.js WebGL core + warp particles, fallback guard, procedural Web Audio SFX | [Futuristic 3D README](./templates/futuristic-3d/README.md) |
+| `svelte` | — | Lightweight Svelte 5 `$state` runes wizard with minimal bundle size | [Svelte README](./templates/svelte/README.md) |
+| `vue` | — | Vue 3 `<script setup lang="ts">` Composition API wizard | [Vue README](./templates/vue/README.md) |
+| `vanilla` | — | Zero-framework HTML/CSS/TS wizard for the smallest `ui.zip` footprint | [Vanilla README](./templates/vanilla/README.md) |
 
-```bash
-# Using Bun (Recommended)
-bun add -d tauri-custom-installer@github:kmaksuut/tauri-custom-installer
+## Quick Start
 
-# Using npm
-npm install -D tauri-custom-installer@github:kmaksuut/tauri-custom-installer
-```
-
----
-
-### 2. Choose Your UI Template & Initialize
-
-Run the initializer and pick your preferred framework:
-
-```bash
-# Interactive selection:
-bunx tci init
-
-# Or pick your framework directly in one command:
-bunx tci init --template react          # ⚛️ React 19 + Tailwind CSS + Lucide (Default)
-bunx tci init --template futuristic-3d  # 🚀 3D Holographic Gaming (Three.js WebGL + Audio SFX)
-bunx tci init --template svelte         # 🧡 Svelte 5 + TypeScript
-bunx tci init --template vue            # 💚 Vue 3 + TypeScript
-bunx tci init --template vanilla        # 🍦 Vanilla HTML / CSS / TypeScript
-```
-
-> **Note:** If an `installer/` directory already exists, append `--force` to re-initialize:  
-> `bunx tci init --template svelte --force`
-
-After initializing, install the UI dependencies:
-```bash
-cd installer && bun install && cd ..
-# or: cd installer && npm install && cd ..
-```
-
----
-
-### 3. Develop & Build
+### 1. Initialize Installer UI
 
 ```bash
-# 1. Live UI Preview with HMR & 10-Scenario Simulator (No files modified)
-bun run installer:dev
+# Default React template
+npx @tauri-custom-installer/cli init
 
-# 2. Build the Standalone Setup Executable (dist/<AppName>-Setup-1.0.0-x64.exe)
-bun run installer:build
+# Interactive 3D Three.js sci-fi template
+npx @tauri-custom-installer/cli init --template futuristic-3d
+# (or shorthand: --template 3d)
+
+# Svelte, Vue, or Vanilla TypeScript
+npx @tauri-custom-installer/cli init --template svelte
+npx @tauri-custom-installer/cli init --template vue
+npx @tauri-custom-installer/cli init --template vanilla
 ```
 
----
+During `init`, choose your default Windows installation scope:
+- `perUser` — Installs to `%LOCALAPPDATA%` without UAC elevation prompts *(recommended)*
+- `perMachine` — Installs to `Program Files` with UAC elevation
+- `both` — Lets end users pick the scope inside the installer UI
 
-## 🎨 Templates & Customization Guide
+### 2. Preview UI in Browser or Dry-Run Sandbox
 
-All templates are production-ready out-of-the-box and automatically read your application name, version, publisher, and icons from `src-tauri/tauri.conf.json`. Customizing the UI is as simple as editing standard frontend code.
-
----
-
-### ⚛️ React 19 (`--template react`)
-
-- **Main File**: `installer/src/App.tsx`
-- **Styling**: Tailwind CSS + Lucide Icons
-- **SDK Import**: `@tauri-custom-installer/client/react`
-
-```tsx
-import { useInstaller } from '@tauri-custom-installer/client/react';
-
-export function App() {
-  const {
-    step,                   // 'welcome' | 'options' | 'running_warning' | 'installing' | 'completed' | 'error'
-    action,                 // 'install' | 'upgrade' | 'repair' | 'downgrade'
-    installPath,            // Default: %LOCALAPPDATA%\<AppName>
-    setInstallPath,
-    browseInstallPath,      // Native Windows Explorer folder picker dialog
-    createDesktopShortcut,
-    setCreateDesktopShortcut,
-    autoLaunchOnStartup,
-    setAutoLaunchOnStartup,
-    progress,               // { percent, current_file, speed_bps, eta_seconds }
-    validation,             // { is_valid, has_enough_space, available_bytes }
-    startInstall,
-    launchApp,
-    minimize,
-    exit,
-  } = useInstaller();
-
-  return (
-    <div className="w-[680px] h-[450px] bg-slate-900 text-white rounded-2xl ...">
-      {/* Design your custom UI here */}
-    </div>
-  );
-}
+```bash
+# Instant Vite HMR preview with built-in mock scenarios
+npx @tauri-custom-installer/cli dev
 ```
 
----
+Append `?scenario=...` in the browser to preview every edge state:
+- `?scenario=success`
+- `?scenario=app_running`
+- `?scenario=already_installed_upgrade`
+- `?scenario=insufficient_space`
+- `?scenario=uninstall`
 
-### 🚀 Futuristic 3D Gaming (`--template futuristic-3d` or `--template 3d`)
+### 3. Build Single-File Windows SFX (`-Setup.exe`)
 
-- **Main Files**: `installer/src/App.tsx` & `installer/src/components/ThreeCanvas.tsx`
-- **3D Engine**: Three.js WebGL (Interactive Mouse Drag & Orbit Physics)
-- **Audio Engine**: Procedural Web Audio API Synthesizer (Sci-Fi hover, click & warp drive SFX)
-
-```tsx
-// Interactive 3D Canvas reacts dynamically to installation state and mouse movements:
-<ThreeCanvas stage={progress.stage || step} percent={progress.percent} />
+```bash
+npx @tauri-custom-installer/cli build
 ```
 
-**Key Features:**
-- 🎮 **Interactive 3D Holographic Core**: Click & drag with mouse to orbit and inspect the spinning quantum reactor in real-time.
-- 🌌 **Warp Speed Particle Drive**: Particle stream accelerates dynamically into a high-speed warp tunnel during file extraction.
-- 🔊 **Built-in Procedural Audio SFX**: High-tech cyber sound effects on button clicks and stage transitions with an in-window Mute/Unmute toggle.
-- ⚡ **Telemetry HUD**: Live MB/s speed gauges, ETA countdown, and sector file readouts.
+Release builds compile your Tauri app payload (`.tar.zst` or `.zip`), obfuscate the UI bundle, package V2 SHA-256 CTR armored SFX sections, verify/stage configured `.cer` files, sign with `signtool` if configured, and optionally emit WinGet YAML manifests.
 
----
+## CLI Command Reference
 
-### 🧡 Svelte 5 (`--template svelte`)
+| Command | Alias | Description |
+| --- | --- | --- |
+| `tci init` | — | Scaffold installer UI template & `tci.config.json` + `.gitignore` rules |
+| `tci dev` | — | Start Vite HMR UI simulator or sandboxed native preview (`TCI_DRY_RUN=1`) |
+| `tci build` | — | Compile payload + obfuscated UI + V2 armored & signed SFX `-Setup.exe` |
+| `tci cert [check\|generate\|verify]` | — | Locate `signtool.exe`, generate dev certs, or inspect SHA-256 cert thumbprints |
+| `tci winget` | — | Generate WinGet (`winget-pkgs`) submission YAML manifests |
+| `tci upgrade` | `update` | Synchronize `@tauri-custom-installer/client` and template setup versions |
+| `tci clean` | — | Remove `.tci/`, `.payload_staging/`, and temporary build artifacts |
+| `tci check` | `doctor` | Check Rust toolchain, Tauri CLI, `signtool.exe`, and `tci.config.json` |
 
-- **Main File**: `installer/src/App.svelte`
-- **Styling**: Scoped CSS / Modern Svelte 5 Runes
-- **SDK Import**: `@tauri-custom-installer/client/svelte`
+See the full [CLI Reference](./packages/cli/README.md) for all flags and `tci.config.json` signing/certificate schema options.
 
-```svelte
-<script lang="ts">
-  import { createSvelteInstaller } from '@tauri-custom-installer/client/svelte';
+## Configuration (`tci.config.json`)
 
-  const installer = createSvelteInstaller();
-</script>
-
-<main class="installer-window">
-  {#if $installer.step === 'welcome'}
-    <h1>Welcome to {$installer.manifest.appName} Setup</h1>
-    <button on:click={() => installer.setStep('options')}>Next</button>
-  {:else if $installer.step === 'installing'}
-    <div class="progress-bar" style="width: {$installer.progress.percent}%"></div>
-  {/if}
-</main>
-```
-
----
-
-### 💚 Vue 3 (`--template vue`)
-
-- **Main File**: `installer/src/App.vue`
-- **Styling**: Scoped CSS / Composition API
-- **SDK Import**: `@tauri-custom-installer/client/vue`
-
-```vue
-<script setup lang="ts">
-import { useInstaller } from '@tauri-custom-installer/client/vue';
-
-const { step, manifest, progress, startInstall, selectFolder } = useInstaller();
-</script>
-
-<template>
-  <div class="installer-card">
-    <h2>Install {{ manifest.appName }} (v{{ manifest.version }})</h2>
-    <button @click="startInstall">Install Now</button>
-  </div>
-</template>
-```
-
----
-
-### 🍦 Vanilla TypeScript (`--template vanilla`)
-
-- **Main Files**: `installer/src/main.ts` & `installer/index.html`
-- **SDK Import**: `@tauri-custom-installer/client`
-
-```ts
-import { createInstallerStore } from '@tauri-custom-installer/client';
-
-const store = createInstallerStore();
-store.subscribe((state) => {
-  document.getElementById('status')!.textContent = `Status: ${state.step} (${state.progress.percent}%)`;
-});
-await store.init();
-```
-
----
-
-## ⚙️ Configuration Reference (`tci.config.json`)
-
-The `tci.config.json` file in your project root is the single source of truth:
-
-```json
+```jsonc
 {
-  "productName": "My App",
-  "identifier": "com.example.myapp",
+  "appName": "My App",
+  "appId": "com.example.myapp",
   "version": "1.0.0",
-  "publisher": "My Company",
-  "install": {
-    "mode": "perUser",
-    "shortcuts": {
-      "desktop": true,
-      "startMenu": true,
-      "startMenuFolder": "My App"
-    },
-    "autostart": "ask",
-    "runAfterInstall": true,
-    "addToPath": false
-  },
-  "compression": "zstd",
-  "output": "./dist"
+  "publisher": "Example Corp",
+  "executableName": "my-app.exe",
+  "installMode": "perUser",
+  "obfuscate": true,
+  "certificates": [
+    {
+      "path": "./certs/publisher-ca.cer",
+      "store": "TrustedPublisher",
+      "scope": "currentUser",
+      "sha256Thumbprint": "optional-64-hex-sha256"
+    }
+  ],
+  "sign": {
+    "pfxPath": "./certs/codesign.pfx",
+    "passwordEnv": "TCI_PFX_PASSWORD",
+    "timestampUrl": "http://timestamp.digicert.com"
+  }
 }
 ```
 
-| Key | Default | Description |
-| :--- | :--- | :--- |
-| `install.mode` | `"perUser"` | `"perUser"` (%LOCALAPPDATA%, no UAC) or `"perMachine"` (Program Files, requires Admin). |
-| `install.shortcuts.desktop` | `true` | Create desktop `.lnk` shortcut via native Win32 COM. |
-| `install.shortcuts.startMenu` | `true` | Create Start Menu shortcut stamped with `AppUserModelID` for toast notifications. |
-| `install.autostart` | `"ask"` | Autostart with Windows (`"ask"`, `"always"`, or `"never"`). |
-| `compression` | `"zstd"` | Payload format: `"zstd"` (ultra-fast tar.zst) or `"zip"`. |
-| `output` | `"./dist"` | Target directory for the final setup `.exe`. |
+> [!IMPORTANT]
+> Never commit `.pfx`, `.p12`, `.key`, `.key.pem`, or `.env` files. Pass signing secrets through environment variables such as `sign.passwordEnv` (`TCI_PFX_PASSWORD`).
 
----
+## Monorepo Packages & Documentation
 
-## 🧪 Browser Mock & Simulator
+- [`packages/core`](./packages/core/README.md) (`tauri-custom-installer-core`): Rust SFX V1/V2 engine, `SectionReader`, `.tar.zst`/`.zip` transactional extractor, Win32 COM/CryptoAPI OS integration, Registry sandbox, and `tci://` protocol handler.
+- [`packages/client`](./packages/client/README.md) (`@tauri-custom-installer/client`): Framework-agnostic SDK (`InstallerApi`, `createInstallerStore`, simulator driver, RTL/i18n) + React/Svelte/Vue/Solid bindings.
+- [`packages/cli`](./packages/cli/README.md) (`@tauri-custom-installer/cli`): `tci` CLI for scaffolding, obfuscation, SFX V2 packaging, certificates, signing, and WinGet generation.
+- [`packages/runtime`](./packages/runtime/Cargo.toml) (`tci-runtime`): Minimal Tauri v2 runtime executable embedded at the head of Single-File SFX binaries.
+- [Architecture Overview](./docs/ARCHITECTURE.md) | [Integration Guide](./docs/INTEGRATION_GUIDE.md) | [Security Policy](./SECURITY.md) | [CI/CD Guide](./docs/CI_CD.md) | [Windows Registry Spec](./docs/WINDOWS_REGISTRY.md)
 
-When developing your installer UI in browser mode (`bun run installer:dev`), you can test every edge case without modifying any system files by adding `?scenario=` to `http://localhost:1421`:
+## Repository Development & Orchestration
 
-- `?scenario=success` — Normal installation flow
-- `?scenario=already_installed_upgrade` — Upgrade flow from an existing version
-- `?scenario=repair` — Re-install / repair flow
-- `?scenario=app_running` — Triggers "Application is Currently Running" warning modal
-- `?scenario=insufficient_space` — Simulates low disk space error
-- `?scenario=permission_denied` — Simulates directory write permission error
-- `?scenario=corrupted_payload` — Simulates SHA-256 integrity verification failure
-- `?mode=uninstall` — Opens the Uninstaller view
-
----
-
-## 🖥️ CLI Commands & End-User Switches
-
-### Developer CLI (`tci`)
 ```bash
-bunx tci init [-t react|svelte|vue|vanilla] [-y] [--force]
-bun run installer:dev [--native]    # Dev preview (browser or dry-run sandboxed window)
-bun run installer:build             # Build production Setup .exe
-bunx tci winget                     # Generate WinGet YAML package manifest
+# Run full cleanup, version sync, security/UI/secret audits, Rust/Client/CLI tests & tarball checks
+npm run orchestrate
+
+# Targeted orchestrator checks
+npm run orchestrate:clean
+npm run orchestrate:sync
+npm run orchestrate:audit
+npm run orchestrate:audit:ui
+npm run orchestrate:audit:diff
+npm run orchestrate:verify
 ```
 
-### End-User Switches (NSIS & Silent Compatible)
-The generated `dist/MyApp-Setup.exe` accepts standard switches:
+## License
 
-| Switch | Description |
-| :--- | :--- |
-| `/S` | **Silent Mode**: Installs with zero UI, zero prompts, and exits with code `0`. |
-| `/D=<path>` | Overrides target installation directory (e.g. `/D=C:\Tools\MyApp`). |
-| `/P` | **Passive Mode**: Displays progress UI only without requiring user interaction. |
-| `/UPDATE` | Upgrades existing installation while preserving user preferences. |
-| `/R` | Relaunches application after installation finishes. |
-| `/NS` | Suppresses shortcut creation. |
-| `--uninstall` | Launches uninstallation mode. |
-
----
-
-## 🔒 Security Architecture
-
-- **Manifest-Driven Deletion**: Uninstallation deletes *only* files recorded in `.tci/manifest.json`. Never deletes entire user folders.
-- **Dangerous Path Deny-List**: Rejects root drives (`C:\`), `%WINDIR%`, Desktop, and user profile roots in native Rust.
-- **Zero PowerShell**: 100% native Win32 COM APIs (`IShellLinkW`, `IPropertyStore`, `IFileOpenDialog`) to avoid antivirus heuristics and execution policy blocks.
-- **Streaming SHA-256 Verification**: Payload integrity is cryptographically verified before extraction.
-- **Authenticode Compatible**: Supports digital code signing via `signtool` / `signCommand`.
-
----
-
-## 📄 License
-
-MIT © [kmaksuut](https://github.com/kmaksuut) & Tauri Custom Installer Contributors.
+MIT © [kmaksuut](https://github.com/kmaksuut)

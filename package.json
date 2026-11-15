@@ -46,12 +46,21 @@
     }
   },
   "files": [
+    "AGENTS.md",
+    "CLAUDE.md",
     "packages/cli/dist",
     "packages/client/dist",
     "packages/client/package.json",
     "packages/core/Cargo.toml",
     "packages/core/src",
-    "templates"
+    "templates",
+    "!**/node_modules/**",
+    "!**/*.bunx",
+    "!templates/*/dist/**",
+    "!templates/*/src-tauri/gen/**",
+    "!templates/*/src-tauri/payload/**",
+    "!templates/*/src-tauri/target/**",
+    "!templates/*/.payload_staging/**"
   ],
   "workspaces": [
     "packages/*",
@@ -60,9 +69,17 @@
   "scripts": {
     "build": "npm --prefix packages/client run build && npm --prefix packages/cli run build",
     "prepare": "npm run build",
-    "test": "npm --prefix packages/client run test && cargo test --package tauri-custom-installer-core",
+    "test": "npm --prefix packages/client run test && npm --prefix packages/cli run test && cargo test --package tauri-custom-installer-core",
     "test:rust": "cargo test --package tauri-custom-installer-core",
-    "test:client": "npm --prefix packages/client run test"
+    "test:client": "npm --prefix packages/client run test",
+    "test:cli": "npm --prefix packages/cli run test",
+    "orchestrate": "node scripts/orchestrate.mjs all",
+    "orchestrate:clean": "node scripts/orchestrate.mjs clean",
+    "orchestrate:sync": "node scripts/orchestrate.mjs sync",
+    "orchestrate:audit": "node scripts/orchestrate.mjs audit",
+    "orchestrate:audit:ui": "node scripts/orchestrate.mjs audit:ui",
+    "orchestrate:audit:diff": "node scripts/orchestrate.mjs audit:diff",
+    "orchestrate:verify": "node scripts/orchestrate.mjs verify"
   },
   "dependencies": {
     "archiver": "^7.0.1",

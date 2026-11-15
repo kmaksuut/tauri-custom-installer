@@ -9,7 +9,7 @@ use crate::registry::{check_existing_installation_with_name, remove_full_registr
 use crate::shortcuts::remove_shortcuts;
 
 /// Checks if a path is a symlink / NTFS junction / reparse point so we never follow it into another directory.
-fn is_reparse_point(path: &Path) -> bool {
+pub fn is_reparse_point(path: &Path) -> bool {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::fs::MetadataExt;
@@ -327,29 +327,70 @@ fn schedule_delete_on_reboot(path: &Path) {
     }
 }
 
+fn normalize_dir_key(path: &str) -> String {
+    path.trim()
+        .replace('/', "\\")
+        .trim_end_matches('\\')
+        .to_lowercase()
+}
+
 pub fn run_worker_cleanup(target_dir: &str, app_id: &str, app_name: &str) {
     std::thread::sleep(std::time::Duration::from_millis(800));
 
     let path = Path::new(target_dir);
-    if path.exists() && is_dangerous_install_path(path).is_none() && !is_reparse_point(path) {
-        let uninst = path.join("uninstall.exe");
-        let tci_dir = path.join(".tci");
-
-        for _ in 0..8 {
-            if uninst.exists() {
-                let _ = fs::remove_file(&uninst);
-            }
-            if tci_dir.exists() && !is_reparse_point(&tci_dir) {
-                let _ = fs::remove_dir_all(&tci_dir);
-            }
-            // Only remove `path` if it is now completely empty (`fs::remove_dir`, never `remove_dir_all`!)
-            if fs::remove_dir(path).is_ok() || !uninst.exists() {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(350));
-        }
-        let _ = fs::remove_dir(path);
+    if !path.exists() || is_dangerous_install_path(path).is_some() || is_reparse_point(path) {
+        return;
     }
+
+    let uninst = path.join("uninstall.exe");
+    let tci_dir = path.join(".tci");
+    let local_manifest_path = tci_dir.join("manifest.json");
+    let manifest_opt = read_install_manifest(path, app_id);
+
+    // Verify ownership: if a local .tci/manifest.json exists, it must belong to this app;
+    // otherwise require local TCI artifacts (uninstall.exe / .tci), a matching registry record,
+    // or a backup manifest whose install_dir matches target_dir.
+    if local_manifest_path.exists() {
+        if let Some(ref m) = manifest_opt {
+            let same_id = !app_id.trim().is_empty() && m.app_id == app_id;
+            let same_name =
+                !app_name.trim().is_empty() && m.app_name.eq_ignore_ascii_case(app_name);
+            if !same_id && !same_name {
+                return;
+            }
+        }
+    }
+
+    let has_tci_artifacts = (uninst.exists() && !is_reparse_point(&uninst))
+        || (tci_dir.exists() && !is_reparse_point(&tci_dir));
+    let registry_matches = check_existing_installation_with_name(app_id, Some(app_name))
+        .map(|e| normalize_dir_key(&e.install_path) == normalize_dir_key(target_dir))
+        .unwrap_or(false);
+    let backup_manifest_matches = manifest_opt
+        .map(|m| {
+            (m.app_id == app_id || m.app_name.eq_ignore_ascii_case(app_name))
+                && normalize_dir_key(&m.install_dir) == normalize_dir_key(target_dir)
+        })
+        .unwrap_or(false);
+
+    if !has_tci_artifacts && !registry_matches && !backup_manifest_matches {
+        return;
+    }
+
+    for _ in 0..8 {
+        if uninst.exists() && !is_reparse_point(&uninst) {
+            let _ = fs::remove_file(&uninst);
+        }
+        if tci_dir.exists() && !is_reparse_point(&tci_dir) {
+            let _ = fs::remove_dir_all(&tci_dir);
+        }
+        // Only remove `path` if it is now completely empty (`fs::remove_dir`, never `remove_dir_all`!)
+        if fs::remove_dir(path).is_ok() || !uninst.exists() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(350));
+    }
+    let _ = fs::remove_dir(path);
 
     remove_shortcuts(app_name, None, &[]);
     let _ = remove_full_registry_entries(app_id, app_name, None, &[], &[], Some(target_dir));

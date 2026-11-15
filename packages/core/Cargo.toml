@@ -5,8 +5,8 @@ edition = "2021"
 description = "Core native engine for Tauri v2 custom installers"
 authors = ["Tauri Custom Installer Contributors"]
 license = "MIT"
-repository = "https://github.com/tauri-custom-installer/tauri-custom-installer"
-homepage = "https://github.com/tauri-custom-installer/tauri-custom-installer"
+repository = "https://github.com/kmaksuut/tauri-custom-installer"
+homepage = "https://github.com/kmaksuut/tauri-custom-installer"
 keywords = ["tauri", "installer", "windows", "nsis", "setup"]
 categories = ["development-tools::build-utils", "os::windows-apis"]
 
@@ -36,5 +36,6 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_Registry",
     "Win32_System_LibraryLoader",
     "Win32_Security",
+    "Win32_Security_Cryptography",
     "Win32_Globalization",
 ] }

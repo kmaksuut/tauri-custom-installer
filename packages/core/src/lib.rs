@@ -1,3 +1,4 @@
+pub mod certs;
 pub mod commands;
 pub mod disk;
 pub mod extractor;
@@ -349,19 +350,59 @@ fn guess_mime_type(path: &str) -> &'static str {
         "text/css; charset=utf-8"
     } else if lower.ends_with(".json") {
         "application/json; charset=utf-8"
+    } else if lower.ends_with(".wasm") {
+        "application/wasm"
+    } else if lower.ends_with(".glb") {
+        "model/gltf-binary"
+    } else if lower.ends_with(".gltf") {
+        "model/gltf+json"
     } else if lower.ends_with(".svg") {
         "image/svg+xml"
     } else if lower.ends_with(".png") {
         "image/png"
+    } else if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
+        "image/jpeg"
+    } else if lower.ends_with(".webp") {
+        "image/webp"
     } else if lower.ends_with(".ico") {
         "image/x-icon"
     } else if lower.ends_with(".woff2") {
         "font/woff2"
     } else if lower.ends_with(".woff") {
         "font/woff"
+    } else if lower.ends_with(".ttf") {
+        "font/ttf"
+    } else if lower.ends_with(".otf") {
+        "font/otf"
+    } else if lower.ends_with(".mp3") {
+        "audio/mpeg"
+    } else if lower.ends_with(".wav") {
+        "audio/wav"
+    } else if lower.ends_with(".ogg") {
+        "audio/ogg"
     } else {
         "application/octet-stream"
     }
+}
+
+fn percent_decode_path(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(hex) = std::str::from_utf8(&bytes[i + 1..i + 3]) {
+                if let Ok(val) = u8::from_str_radix(hex, 16) {
+                    out.push(val);
+                    i += 3;
+                    continue;
+                }
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Registers all custom installer IPC commands, CLI/silent mode handlers,
@@ -382,33 +423,37 @@ pub fn register<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
 
     let builder = if let Some(ui_archive_bytes) = appended_ui_bytes {
         builder.register_uri_scheme_protocol("tci", move |_ctx, request| {
-            let uri_path = request.uri().path().trim_start_matches('/');
-            let requested = if uri_path.is_empty() {
-                "index.html"
+            let raw_uri_path = request.uri().path().trim_start_matches('/');
+            let decoded = percent_decode_path(raw_uri_path);
+            let requested = if decoded.is_empty() {
+                Some("index.html".to_string())
             } else {
-                uri_path
+                extractor::sanitize_archive_entry_path(&decoded)
+                    .map(|p| p.to_string_lossy().replace('\\', "/"))
             };
 
-            let cursor = Cursor::new(ui_archive_bytes.as_slice());
-            if let Ok(mut zip) = zip::ZipArchive::new(cursor) {
-                let target_name = if zip.by_name(requested).is_ok() {
-                    requested
-                } else {
-                    "index.html"
-                };
+            if let Some(clean_requested) = requested {
+                let cursor = Cursor::new(ui_archive_bytes.as_slice());
+                if let Ok(mut zip) = zip::ZipArchive::new(cursor) {
+                    let target_name = if zip.by_name(&clean_requested).is_ok() {
+                        clean_requested.as_str()
+                    } else {
+                        "index.html"
+                    };
 
-                if let Ok(mut file) = zip.by_name(target_name) {
-                    let mut body = Vec::with_capacity(file.size() as usize);
-                    if file.read_to_end(&mut body).is_ok() {
-                        return tauri::http::Response::builder()
-                            .status(200)
-                            .header("Content-Type", guess_mime_type(target_name))
-                            .header(
-                                "Content-Security-Policy",
-                                "default-src 'self' tci: http://tci.localhost ipc: http://ipc.localhost; img-src 'self' data: blob: tci: http://tci.localhost; style-src 'self' 'unsafe-inline' tci: http://tci.localhost; script-src 'self' 'unsafe-inline' tci: http://tci.localhost",
-                            )
-                            .body(body)
-                            .unwrap();
+                    if let Ok(mut file) = zip.by_name(target_name) {
+                        let mut body = Vec::with_capacity(file.size() as usize);
+                        if file.read_to_end(&mut body).is_ok() {
+                            return tauri::http::Response::builder()
+                                .status(200)
+                                .header("Content-Type", guess_mime_type(target_name))
+                                .header(
+                                    "Content-Security-Policy",
+                                    "default-src 'self' tci: http://tci.localhost ipc: http://ipc.localhost; img-src 'self' data: blob: tci: http://tci.localhost; media-src 'self' data: blob: tci: http://tci.localhost; font-src 'self' data: tci: http://tci.localhost; style-src 'self' 'unsafe-inline' tci: http://tci.localhost; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' tci: http://tci.localhost; worker-src 'self' blob: tci: http://tci.localhost; connect-src 'self' data: blob: tci: http://tci.localhost ipc: http://ipc.localhost",
+                                )
+                                .body(body)
+                                .unwrap();
+                        }
                     }
                 }
             }

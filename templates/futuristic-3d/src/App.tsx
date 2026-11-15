@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useInstaller } from '@tauri-custom-installer/client/react';
 import { TitleBar } from './components/TitleBar';
 import { WelcomeStep } from './components/WelcomeStep';
@@ -20,9 +19,15 @@ export function App() {
     installPath,
     setInstallPath,
     browseInstallPath,
+    createDesktopShortcut,
     setCreateDesktopShortcut,
+    createStartMenuShortcut,
     setCreateStartMenuShortcut,
+    autoLaunchOnStartup,
     setAutoLaunchOnStartup,
+    launchAfterInstall,
+    setLaunchAfterInstall,
+    errorMessage,
     progress,
     validation,
     startInstall,
@@ -40,19 +45,13 @@ export function App() {
     requiredBytes: defaultConfig.requiredBytes,
   });
 
-  const [installOptions, setInstallOptions] = useState({
-    desktopShortcut: true,
-    startMenuShortcut: true,
-    autostart: false,
-  });
-
   if (isUninstallMode) {
     return (
       <UninstallView
         appName={manifest?.appName || defaultConfig.appName}
         appId={manifest?.appId || defaultConfig.appId}
         executableName={manifest?.executableName || defaultConfig.executableName}
-        installDir={installPath || defaultConfig.appName}
+        installDir={installPath}
         onExit={exit}
       />
     );
@@ -95,25 +94,13 @@ export function App() {
               availableBytes: validation?.available_bytes ?? 0,
               errorMessage: validation?.error_message ?? undefined,
             }}
-            requiredBytes={defaultConfig.requiredBytes}
-            desktopShortcut={installOptions.desktopShortcut}
-            onToggleDesktopShortcut={() => {
-              const val = !installOptions.desktopShortcut;
-              setInstallOptions({ ...installOptions, desktopShortcut: val });
-              setCreateDesktopShortcut(val);
-            }}
-            startMenuShortcut={installOptions.startMenuShortcut}
-            onToggleStartMenuShortcut={() => {
-              const val = !installOptions.startMenuShortcut;
-              setInstallOptions({ ...installOptions, startMenuShortcut: val });
-              setCreateStartMenuShortcut(val);
-            }}
-            autostart={installOptions.autostart}
-            onToggleAutostart={() => {
-              const val = !installOptions.autostart;
-              setInstallOptions({ ...installOptions, autostart: val });
-              setAutoLaunchOnStartup(val);
-            }}
+            requiredBytes={manifest?.uncompressedSizeBytes || defaultConfig.requiredBytes}
+            desktopShortcut={createDesktopShortcut}
+            onToggleDesktopShortcut={() => setCreateDesktopShortcut(!createDesktopShortcut)}
+            startMenuShortcut={createStartMenuShortcut}
+            onToggleStartMenuShortcut={() => setCreateStartMenuShortcut(!createStartMenuShortcut)}
+            autostart={autoLaunchOnStartup}
+            onToggleAutostart={() => setAutoLaunchOnStartup(!autoLaunchOnStartup)}
             onBack={() => setStep('welcome')}
             onInstall={() => startInstall()}
           />
@@ -138,9 +125,44 @@ export function App() {
         {step === 'completed' && (
           <CompletedStep
             appName={manifest?.appName || defaultConfig.appName}
+            launchAfterInstall={launchAfterInstall}
+            onToggleLaunchAfterInstall={setLaunchAfterInstall}
             onFinish={exit}
             onLaunch={launchApp}
           />
+        )}
+
+        {(step === 'error' || step === 'cancelled') && (
+          <div
+            className="relative z-10 flex flex-col justify-between h-full p-6 text-slate-100 max-w-md pointer-events-auto"
+            role="alert"
+          >
+            <div className="space-y-3 my-auto">
+              <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded border border-rose-500/40 bg-rose-950/40 text-rose-400 text-[11px] font-mono tracking-wider">
+                <span>{step === 'cancelled' ? 'PROTOCOL ABORTED' : 'DEPLOYMENT HALTED'}</span>
+              </div>
+              <h2 className="text-xl font-black uppercase text-white tracking-wide">
+                {step === 'cancelled' ? 'INSTALLATION CANCELLED' : 'SYSTEM ERROR DETECTED'}
+              </h2>
+              <p className="text-xs text-rose-300 font-mono leading-relaxed break-words">
+                {errorMessage || 'Installation was cancelled and rolled back safely.'}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setStep('options')}
+                className="flex-1 py-2 px-4 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition-all"
+              >
+                RETURN TO CONFIGURATION
+              </button>
+              <button
+                onClick={() => exit()}
+                className="py-2 px-4 rounded border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white font-mono text-xs uppercase transition-colors"
+              >
+                EXIT
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

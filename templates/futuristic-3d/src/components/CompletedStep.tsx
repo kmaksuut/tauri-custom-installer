@@ -4,27 +4,43 @@ import { sound } from './SoundEffects';
 
 interface CompletedStepProps {
   appName: string;
+  launchAfterInstall?: boolean;
+  onToggleLaunchAfterInstall?: (val: boolean) => void;
   onFinish: () => void;
   onLaunch: () => void;
 }
 
 export const CompletedStep: React.FC<CompletedStepProps> = ({
   appName,
+  launchAfterInstall,
+  onToggleLaunchAfterInstall,
   onFinish,
   onLaunch,
 }) => {
-  const [autoLaunch, setAutoLaunch] = useState(true);
+  const [localAutoLaunch, setLocalAutoLaunch] = useState(launchAfterInstall ?? true);
+  const autoLaunch = launchAfterInstall ?? localAutoLaunch;
 
   useEffect(() => {
     sound.success();
   }, []);
 
+  const handleToggleAutoLaunch = () => {
+    sound.click();
+    const next = !autoLaunch;
+    if (onToggleLaunchAfterInstall) {
+      onToggleLaunchAfterInstall(next);
+    } else {
+      setLocalAutoLaunch(next);
+    }
+  };
+
   const handleComplete = () => {
     sound.warp();
     if (autoLaunch) {
       onLaunch();
+    } else {
+      onFinish();
     }
-    onFinish();
   };
 
   return (
@@ -57,10 +73,7 @@ export const CompletedStep: React.FC<CompletedStepProps> = ({
         </div>
 
         <label
-          onClick={() => {
-            sound.click();
-            setAutoLaunch(!autoLaunch);
-          }}
+          onClick={handleToggleAutoLaunch}
           onMouseEnter={() => sound.hover()}
           className="flex items-center space-x-2.5 cursor-pointer text-slate-300 hover:text-white select-none py-1"
         >
