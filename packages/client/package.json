@@ -1,6 +1,6 @@
 {
   "name": "@tauri-custom-installer/client",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Framework-agnostic Client SDK and adapters (React, Svelte, Vue, Solid, Vanilla) for Tauri v2 custom installers",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

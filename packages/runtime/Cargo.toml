@@ -1,6 +1,6 @@
 [package]
 name = "tci-runtime"
-version = "0.2.0"
+version = "0.2.1"
 description = "Prebuilt self-extracting runtime stub for Tauri Custom Installer"
 edition = "2021"
 license = "MIT"

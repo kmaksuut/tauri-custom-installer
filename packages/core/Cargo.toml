@@ -1,6 +1,6 @@
 [package]
 name = "tauri-custom-installer-core"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Core native engine for Tauri v2 custom installers"
 authors = ["Tauri Custom Installer Contributors"]

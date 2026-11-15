@@ -1,6 +1,6 @@
 {
   "name": "tauri-custom-installer",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Tauri Custom Installer with Tauri v2 — Build modern, web-based (React, Svelte, Vue, Solid, Vanilla) custom installers for Tauri v2 using Tauri v2 itself",
   "bin": {
     "tci": "./packages/cli/dist/index.js",

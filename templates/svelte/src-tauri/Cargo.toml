@@ -1,6 +1,6 @@
 [package]
 name = "tauri-custom-installer-template-svelte"
-version = "0.2.0"
+version = "0.2.1"
 description = "Svelte custom installer for Tauri v2"
 edition = "2021"
 
