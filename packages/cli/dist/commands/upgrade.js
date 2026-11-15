@@ -126,7 +126,7 @@ async function runUpgrade(options = {}) {
             // ignore
         }
     }
-    (0, init_1.syncInstallerMetadataAndSdk)(cwd, targetDir, appConfig, false);
+    (0, init_1.syncInstallerMetadataAndSdk)(cwd, targetDir, appConfig, true);
     (0, init_1.writeInstallerAgentsMd)(targetDir, template);
     (0, init_1.ensureProjectGitignore)(cwd);
     (0, init_1.ensureRootPackageScripts)(cwd);

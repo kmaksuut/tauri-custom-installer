@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.syncAppIconsToInstaller = syncAppIconsToInstaller;
 exports.runBuild = runBuild;
 const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
@@ -185,6 +186,27 @@ function copyDirIntoStage(srcDir, destRelPrefix, copyIntoStage) {
         }
     }
 }
+function syncAppIconsToInstaller(cwd, installerDir) {
+    const userIconsDir = node_path_1.default.join(cwd, 'src-tauri', 'icons');
+    const installerIconsDir = node_path_1.default.join(installerDir, 'src-tauri', 'icons');
+    if (!node_fs_1.default.existsSync(userIconsDir) || !node_fs_1.default.existsSync(installerIconsDir)) {
+        return false;
+    }
+    let copied = false;
+    for (const iconFile of ['icon.ico', '32x32.png', '128x128.png', '128x128@2x.png']) {
+        const srcIcon = node_path_1.default.join(userIconsDir, iconFile);
+        if (node_fs_1.default.existsSync(srcIcon)) {
+            try {
+                node_fs_1.default.copyFileSync(srcIcon, node_path_1.default.join(installerIconsDir, iconFile));
+                copied = true;
+            }
+            catch {
+                // ignore copy errors
+            }
+        }
+    }
+    return copied;
+}
 async function runBuild(options) {
     const startTime = Date.now();
     const cwd = process.cwd();
@@ -195,6 +217,8 @@ async function runBuild(options) {
         console.error(picocolors_1.default.yellow(`Run '${picocolors_1.default.bold('tauri-custom-installer init')}' first.`));
         process.exit(1);
     }
+    // Automatically propagate updated application icons to installer/src-tauri/icons if present
+    syncAppIconsToInstaller(cwd, installerDir);
     const isRelease = options.debug ? false : options.release !== false;
     const profileDirName = isRelease ? 'release' : 'debug';
     const targetTriple = resolveHostTargetTriple(options.arch);

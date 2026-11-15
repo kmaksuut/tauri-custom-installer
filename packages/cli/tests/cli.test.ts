@@ -4,6 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'bun:test';
 import { generateDevCertificate, parseCertificateFile } from '../src/commands/cert';
+import { syncAppIconsToInstaller } from '../src/commands/build';
 import { runClean } from '../src/commands/clean';
 import { splitCommandLine } from '../src/utils/exec';
 import { obfuscateUiBundleDirectory } from '../src/utils/obfuscator';
@@ -153,5 +154,25 @@ describe('TCI CLI Security, Armor, Signing & Hygiene', () => {
     expect(fs.existsSync(payloadDir)).toBe(false);
     expect(fs.existsSync(tciCache)).toBe(false);
     expect(fs.existsSync(keptSrc)).toBe(true);
+  });
+
+  it('automatically synchronizes updated app icons from src-tauri/icons to installer/src-tauri/icons', () => {
+    const workspaceDir = makeTempDir('tci-cli-icons-');
+    const userIconsDir = path.join(workspaceDir, 'src-tauri', 'icons');
+    const installerIconsDir = path.join(workspaceDir, 'installer', 'src-tauri', 'icons');
+
+    fs.mkdirSync(userIconsDir, { recursive: true });
+    fs.mkdirSync(installerIconsDir, { recursive: true });
+
+    fs.writeFileSync(path.join(userIconsDir, 'icon.ico'), 'NEW_CUSTOM_APP_ICON_DATA');
+    fs.writeFileSync(path.join(userIconsDir, '32x32.png'), 'PNG32');
+    fs.writeFileSync(path.join(installerIconsDir, 'icon.ico'), 'OLD_TEMPLATE_ICON_DATA');
+
+    const synced = syncAppIconsToInstaller(workspaceDir, path.join(workspaceDir, 'installer'));
+    expect(synced).toBe(true);
+    expect(fs.readFileSync(path.join(installerIconsDir, 'icon.ico'), 'utf8')).toBe(
+      'NEW_CUSTOM_APP_ICON_DATA'
+    );
+    expect(fs.readFileSync(path.join(installerIconsDir, '32x32.png'), 'utf8')).toBe('PNG32');
   });
 });

@@ -139,7 +139,7 @@ export async function runUpgrade(options: UpgradeOptions = {}): Promise<void> {
     }
   }
 
-  syncInstallerMetadataAndSdk(cwd, targetDir, appConfig, false);
+  syncInstallerMetadataAndSdk(cwd, targetDir, appConfig, true);
   writeInstallerAgentsMd(targetDir, template);
   ensureProjectGitignore(cwd);
   ensureRootPackageScripts(cwd);

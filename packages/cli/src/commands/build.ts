@@ -227,6 +227,27 @@ function copyDirIntoStage(
   }
 }
 
+export function syncAppIconsToInstaller(cwd: string, installerDir: string): boolean {
+  const userIconsDir = path.join(cwd, 'src-tauri', 'icons');
+  const installerIconsDir = path.join(installerDir, 'src-tauri', 'icons');
+  if (!fs.existsSync(userIconsDir) || !fs.existsSync(installerIconsDir)) {
+    return false;
+  }
+  let copied = false;
+  for (const iconFile of ['icon.ico', '32x32.png', '128x128.png', '128x128@2x.png']) {
+    const srcIcon = path.join(userIconsDir, iconFile);
+    if (fs.existsSync(srcIcon)) {
+      try {
+        fs.copyFileSync(srcIcon, path.join(installerIconsDir, iconFile));
+        copied = true;
+      } catch {
+        // ignore copy errors
+      }
+    }
+  }
+  return copied;
+}
+
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startTime = Date.now();
   const cwd = process.cwd();
@@ -238,6 +259,9 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     console.error(pc.yellow(`Run '${pc.bold('tauri-custom-installer init')}' first.`));
     process.exit(1);
   }
+
+  // Automatically propagate updated application icons to installer/src-tauri/icons if present
+  syncAppIconsToInstaller(cwd, installerDir);
 
   const isRelease = options.debug ? false : options.release !== false;
   const profileDirName = isRelease ? 'release' : 'debug';

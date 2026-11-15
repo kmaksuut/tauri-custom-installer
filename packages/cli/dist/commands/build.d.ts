@@ -6,4 +6,5 @@ export interface BuildOptions {
     sign?: boolean;
     dryRun?: boolean;
 }
+export declare function syncAppIconsToInstaller(cwd: string, installerDir: string): boolean;
 export declare function runBuild(options: BuildOptions): Promise<void>;
